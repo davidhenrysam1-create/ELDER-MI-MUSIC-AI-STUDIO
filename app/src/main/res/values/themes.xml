@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ElderMiMusic" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#120E1E</item>
+        <item name="android:navigationBarColor">#120E1E</item>
+    </style>
+</resources>

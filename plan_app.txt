@@ -1,0 +1,266 @@
+================================================================================
+ELDER MI MUSIC AI STUDIO — ARCHITECTURE, SPECIFICATION & IMPLEMENTATION PLAN
+"Your Sound. Your Culture. Your Studio."
+================================================================================
+
+1. EXECUTIVE OVERVIEW & PLATFORM OBJECTIVE
+--------------------------------------------------------------------------------
+Elder Mi Music AI Studio is a professional, interactive, AI-powered music production
+platform tailored specifically for Afrobeats and related African music genres
+(Afro-pop, Afro-fusion, Afro-soul, Amapiano-influenced Afrobeats, South African-
+inspired vocal arrangements, Highlife, and Bongo Flava).
+
+The system serves both emerging African bedroom producers and seasoned studio engineers
+by providing accessible, intelligent AI workflows alongside granular, industry-standard
+digital audio workstation (DAW) controls.
+
+The platform is anchored around three dedicated, non-generic workspaces:
+  1. Sam Vocal Studio (Vocal arrangement, choir, harmonies, ad-libs, doubling, transformation)
+  2. Sam Mix Studio (Multitrack stem mixing, AI balance assistant, EQ/dynamic channels, spatial)
+  3. Sam Mastering Studio (Loudness analysis, tonal balancing, LUFS targeting, release exports)
+
+--------------------------------------------------------------------------------
+2. RECOMMENDED PROGRAMMING LANGUAGES & TECHNICAL STACK
+--------------------------------------------------------------------------------
+To deliver a high-performance, low-latency, modern production environment that runs
+smoothly on mobile and tablet touchscreens while handling heavy AI audio synthesis,
+a dual-tier decoupled architecture is optimal:
+
+A. CLIENT APPLICATION (Native Android Studio DAW):
+   - Language: Kotlin (100% Kotlin 2.2+)
+   - UI Toolkit: Jetpack Compose (Material Design 3 with custom glassmorphic DAW canvas)
+   - Concurrency & Reactive State: Kotlin Coroutines & StateFlow / SharedFlow
+   - Audio Engine:
+     * AndroidX Media3 (ExoPlayer) for high-fidelity multi-stream playback and caching
+     * Android AudioTrack / Oboe (C++ high-performance audio if ultra-low latency needed)
+     * Android Visualizer & Canvas rendering for real-time 60fps waveform & spectrum analysis
+   - Networking & Serialization:
+     * Retrofit 2 + OkHttp (with 60-second timeouts for audio payloads)
+     * Kotlinx.serialization (Type-safe JSON parsing)
+   - Local Cache & Storage:
+     * Android Scoped Storage / Private Cache for audio buffers, stems, and project files
+     * Android Room Database or DataStore for offline project metadata and export history
+   - Cloud AI Integration:
+     * Google Gemini API (gemini-3.5-flash) for "Improve My Prompt", natural language
+       mix/mastering parameter generation, and vocal arrangement orchestration
+
+B. AUDIO DSP & AI MICROSERVICE BACKEND:
+   - Language: Python 3.11+
+   - API Framework: FastAPI (Asynchronous REST + WebSockets for job progress telemetry)
+   - Audio Processing & DSP Libraries:
+     * FFmpeg / PyDub (Transcoding, stem extraction, normalization, sample rate conversion)
+     * Librosa / SoundFile / Scipy (LUFS loudness, spectral analysis, true peak, dynamic range)
+     * Demucs / Spleeter (AI stem separation: vocals, drums, bass, instruments)
+     * PyTorch / ONNX Runtime (Vocal synthesis, harmonization, pitch correction)
+   - Background Task Queue: Celery + Redis or Google Cloud Tasks
+   - Cloud Storage: Google Cloud Storage / Supabase Storage for secure stem and master blobs
+
+WHY THIS COMBINATION IS BEST:
+1. Low Latency & High Responsiveness: Kotlin + Jetpack Compose allows hardware-accelerated
+   rendering of complex audio timelines, animated meters, and multi-lane waveform views without
+   garbage-collection jitter or web-browser audio thread throttling.
+2. Heavy Compute Isolation: AI vocal generation and neural stem processing require GPU compute
+   that cannot run directly inside a mobile device without draining battery or crashing RAM.
+   Offloading heavy synthesis to a Python microservice keeps the Android client fluid and responsive.
+3. Clean Separation of Real vs. Simulated Audio: Audio measurements (LUFS, Peak, True Peak,
+   Stereo Correlation) are computed mathematically via real DSP algorithms, while creative
+   reasoning (prompt interpretation, arrangement logic) is handled by Gemini AI.
+
+--------------------------------------------------------------------------------
+3. COMPREHENSIVE REPOSITORY & FILE STRUCTURE
+--------------------------------------------------------------------------------
+
+elder-mi-music-ai-studio/
+├── metadata.json                          # AI Studio platform identification and capabilities
+├── README.md                              # Complete setup, build, and architecture guide
+├── plan_app.txt                           # Master development blueprint and architectural plan
+├── build.gradle.kts                       # Root project build configuration
+├── settings.gradle.kts                    # Gradle settings and project name definition
+├── gradle/
+│   ├── libs.versions.toml                 # Version catalog (Compose, Coroutines, Media3, Retrofit)
+│   └── wrapper/
+├── app/
+│   ├── build.gradle.kts                   # App module dependencies, plugins, and buildConfig
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── AndroidManifest.xml        # Permissions (INTERNET, RECORD_AUDIO, etc.)
+│   │   │   ├── java/com/example/eldermi/  # Main Kotlin source directory
+│   │   │   │   ├── ElderMiApp.kt          # Application class & DI setup
+│   │   │   │   ├── MainActivity.kt        # Single activity with edge-to-edge Compose entry
+│   │   │   │   │
+│   │   │   │   ├── theme/                 # Afro-futuristic visual design system
+│   │   │   │   │   ├── Color.kt           # Deep Midnight (#090914), Electric Purple, Cyan, Magenta, Gold
+│   │   │   │   │   ├── Type.kt            # Typography definitions & font pairings
+│   │   │   │   │   ├── Theme.kt           # MaterialTheme configuration & Dark DAW ColorScheme
+│   │   │   │   │   └── Glassmorphism.kt   # Translucent surfaces, backdrop blur & glowing borders
+│   │   │   │   │
+│   │   │   │   ├── model/                 # Domain data models
+│   │   │   │   │   ├── Project.kt         # Project metadata, stems, date, genre, status
+│   │   │   │   │   ├── AudioTrack.kt      # Track lane, stem type, mute, solo, gain, pan, waveform
+│   │   │   │   │   ├── VocalLayer.kt      # Harmony, choir, chorus, ad-lib layer definitions
+│   │   │   │   │   ├── MixParameters.kt   # 3-band EQ, compressor, reverb, delay, stereo width
+│   │   │   │   │   ├── MasterProfile.kt   # Target LUFS, true peak, warmth, club, streaming presets
+│   │   │   │   │   ├── AudioAnalysis.kt   # Integrated LUFS, peak dB, true peak, dynamic spread
+│   │   │   │   │   └── ProcessingJob.kt   # Background audio rendering job state & progress
+│   │   │   │   │
+│   │   │   │   ├── audio/                 # Audio engine & DSP integration
+│   │   │   │   │   ├── AudioPlayerManager.kt  # Media3 ExoPlayer multitrack playback orchestrator
+│   │   │   │   │   ├── WaveformExtractor.kt   # Amplitude decimation for canvas waveform drawing
+│   │   │   │   │   ├── AudioAnalyzer.kt       # Real-time RMS & spectrum peak calculation
+│   │   │   │   │   └── AudioExportEngine.kt   # Non-destructive rendering pipeline to WAV/MP3
+│   │   │   │   │
+│   │   │   │   ├── api/                   # Cloud networking & AI orchestration
+│   │   │   │   │   ├── GeminiMusicService.kt  # Gemini 3.5 Flash: Prompt refinement & arrangement
+│   │   │   │   │   ├── AudioBackendApi.kt     # Retrofit client for Python audio microservice
+│   │   │   │   │   └── NetworkModels.kt       # Request and response DTOs for AI processing
+│   │   │   │   │
+│   │   │   │   ├── repository/            # Single source of truth repositories
+│   │   │   │   │   ├── ProjectRepository.kt   # Projects CRUD, state persistence, recent list
+│   │   │   │   │   ├── VocalStudioRepo.kt     # Vocal generation jobs & timeline state
+│   │   │   │   │   ├── MixStudioRepo.kt       # Multitrack stem management & mix settings
+│   │   │   │   │   └── MasteringRepo.kt       # Master profiles, analysis metrics & exports
+│   │   │   │   │
+│   │   │   │   ├── viewmodel/             # StateFlow ViewModels
+│   │   │   │   │   ├── MainViewModel.kt       # Global project context & active studio routing
+│   │   │   │   │   ├── DashboardViewModel.kt  # Recent projects, studio shortcuts, stats
+│   │   │   │   │   ├── VocalStudioViewModel.kt# AI Chorus, Choir, Harmony generation & lanes
+│   │   │   │   │   ├── MixStudioViewModel.kt  # Mixer channels, stem import, EQ/FX & prompts
+│   │   │   │   │   └── MasteringViewModel.kt  # Audio analysis, A/B compare, export renders
+│   │   │   │   │
+│   │   │   │   ├── ui/                    # Jetpack Compose UI Screens & Components
+│   │   │   │   │   ├── navigation/
+│   │   │   │   │   │   ├── AppNavGraph.kt     # Screen destinations & persistent bottom/rail bar
+│   │   │   │   │   │   └── TopAppBar.kt       # Branding, active project, save state, notifications
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── GlassCard.kt       # Translucent frosted cards with glowing borders
+│   │   │   │   │   │   ├── GradientText.kt    # African-futuristic gradient text headers
+│   │   │   │   │   │   ├── WaveformVisualizer.kt # Canvas-based interactive audio waveform lane
+│   │   │   │   │   │   ├── RotaryKnob.kt      # Tactile DAW rotary knob for gain, pan, EQ
+│   │   │   │   │   │   ├── FaderSlider.kt     # Professional DAW channel fader with dB scale
+│   │   │   │   │   │   ├── VUMeter.kt         # Animated peak & RMS LED level meters
+│   │   │   │   │   │   ├── GlobalAudioPlayer.kt # Persistent floating play/pause/scrubber bar
+│   │   │   │   │   │   └── PromptEditorCard.kt# Natural language prompt + "Improve My Prompt"
+│   │   │   │   │   ├── dashboard/
+│   │   │   │   │   │   └── DashboardScreen.kt # Studio selector cards, recent projects, quick actions
+│   │   │   │   │   ├── vocal/
+│   │   │   │   │   │   ├── SamVocalStudioScreen.kt # Vocal multitrack timeline & generator controls
+│   │   │   │   │   │   ├── VocalLaneView.kt        # Harmony, Choir, Chorus, Ad-lib, Double lanes
+│   │   │   │   │   │   └── ChoirArrangerDialog.kt  # South African choir size, density & style dialog
+│   │   │   │   │   ├── mix/
+│   │   │   │   │   │   ├── SamMixStudioScreen.kt   # Multitrack mixer console & stem dropzone
+│   │   │   │   │   │   ├── MixerChannelStrip.kt    # Gain, Pan, EQ, Comp, Reverb, Delay, Mute/Solo
+│   │   │   │   │   │   ├── StemImportGuidance.kt   # FL Studio & Cubase export instructions modal
+│   │   │   │   │   │   └── MixRecommendationsCard.kt # AI proposed stages with review & apply
+│   │   │   │   │   ├── mastering/
+│   │   │   │   │   │   ├── SamMasteringStudioScreen.kt # Loudness meters, profiles & A/B comparison
+│   │   │   │   │   │   ├── LoudnessMeterCard.kt       # Integrated LUFS, True Peak & Dynamic spread
+│   │   │   │   │   │   ├── MasterABCompareView.kt     # Toggle between original and mastered audio
+│   │   │   │   │   │   └── ExportReportDialog.kt      # Technical delivery report & WAV/MP3 download
+│   │   │   │   │   └── common/
+│   │   │   │   │       ├── ProjectsScreen.kt      # Project browser, duplicate, rename, delete
+│   │   │   │   │       ├── VoiceProfilesScreen.kt # Authorized reference vocal timbres & consent
+│   │   │   │   │       └── SettingsScreen.kt      # Audio quality, API keys, storage management
+│   │   │   │   └── utils/
+│   │   │   │       ├── AudioMath.kt           # dB to linear conversion, LUFS calculation formulas
+│   │   │   │       ├── FileUtils.kt           # File validation, MIME type checking, size limits
+│   │   │   │       └── TimeUtils.kt           # Millisecond to mm:ss.ms formatting
+│   │   │   └── res/
+│   │   │       ├── values/
+│   │   │       │   ├── strings.xml            # App name, official workspace names, strings
+│   │   │       │   └── colors.xml             # Primary palette definitions
+│   │   │       └── drawable/
+│   │   │           └── ic_launcher_*.xml      # Adaptive launcher icon
+│   └── tests/                                 # Unit & Robolectric test suite
+└── backend_service/                           # Reference Python Audio Microservice (Cloud Engine)
+    ├── Dockerfile                             # Container for FFmpeg + Librosa + PyTorch
+    ├── requirements.txt                       # fastapi, uvicorn, librosa, soundfile, pydub
+    ├── main.py                                # Endpoints for stem separation & LUFS analysis
+    └── audio_dsp/
+        ├── lufs_analyzer.py                   # EBU R128 integrated loudness & true peak
+        ├── stem_separator.py                  # Demucs separation runner
+        └── vocal_processor.py                 # Pitch shift, harmony generation, formant shift
+
+--------------------------------------------------------------------------------
+4. DETAILED SPECIFICATION OF THE THREE WORKSPACES
+--------------------------------------------------------------------------------
+
+A. SAM VOCAL STUDIO
+- Purpose: AI-assisted vocal arrangement environment specifically tuned for Afrobeats.
+- Functional Modules:
+  1. AI Chorus Generator: Upload instrumental/lead, request catchy call-and-response chorus.
+  2. AI Harmony Generator: High, middle, low third/fifth harmonies, octave doubles, unisons.
+  3. AI Ad-Lib Generator: Sung responses, chants, hype vocal stabs, rhythmic fills.
+  4. South African-Inspired Choir Generator: Layered ensemble harmonies, sustained refrains,
+     group call-and-response with controls for choir size, energy, and density.
+  5. AI Vocal Doubler: Natural humanized stereo doubling with subtle pitch and time variances.
+  6. Authorized Voice Transformation: Timbre modification with mandatory consent gating.
+  7. Interactive Visual Timeline: Multitrack audio waveforms with dedicated lanes for Lead,
+     Chorus, Harmony 1/2/3, Choir, Ad-lib, and Doubler. Full Mute/Solo/Pan/Volume per lane.
+
+B. SAM MIX STUDIO
+- Purpose: Stem mixing console and AI mix balance assistant for multitrack productions.
+- Functional Modules:
+  1. Stem Upload & Validation Zone: Drag-and-drop or file picker supporting WAV, MP3, AIFF, FLAC,
+     and ZIP stem archives.
+  2. FL Studio & Cubase Import Guidance: Step-by-step visual documentation explaining how to
+     export consolidated stems from major DAWs to avoid plugin dependency mismatches.
+  3. AI Mixing Assistant: Natural language prompt input with "Improve My Prompt" button
+     (powered by Gemini 3.5 Flash) that formats amateur descriptions into audio engineering terms.
+  4. "Apply Mixing Recommendations": Displays proposed processing steps (e.g. Sidechain kick
+     at 60Hz, High-shelf boost +2dB on lead vocal at 12kHz, stereo spread on guitars).
+  5. Interactive Mixer Strips: Gain faders, Pan pots, 3-Band Parametric EQ (Low, Mid, High),
+     Compressor threshold/ratio, Reverb send, Delay send, Stereo Width, Mute/Solo/Group.
+  6. Afrobeats Presets: Modern Afrobeats, Afro-pop, Afro-fusion, Amapiano Groove.
+
+C. SAM MASTERING STUDIO
+- Purpose: Release-ready audio mastering workspace with genuine acoustic analysis.
+- Functional Modules:
+  1. Precision Audio Analysis: Measured Integrated Loudness (LUFS), Short-Term Loudness,
+     True Peak (dBFS), Peak Level, Stereo Correlation / Width, and Dynamic Spread.
+  2. 7 Selectable Mastering Profiles:
+     * Streaming-Ready Master (-14 LUFS, -1.0 dBTP)
+     * Loud & Energetic Master (-9 LUFS, -0.3 dBTP)
+     * Warm Afrobeats Master (Analog saturation, punchy mid-bass)
+     * Punchy Club Master (Sub-bass emphasis, aggressive transient punch)
+     * Vocal-Forward Master (Lead presence boost, subtle high-end air)
+     * Bass-Focused Master (Amapiano log drum clarity, tight low-end limiter)
+     * Smooth & Premium Master (Transparent dynamics, open stereo image)
+  3. Mastering Controls: Target LUFS, True-Peak Ceiling, Low-Frequency Weight, Stereo Width,
+     Dynamic Preserver, Limiter, Analog Saturation.
+  4. Master Comparison: Instant A/B toggle with loudness-matched gain compensation to prevent
+     "louder sounds better" psychoacoustic bias. Before/After waveform overlay.
+  5. Validated Audio Export: High-resolution WAV (24-bit/48kHz, 16-bit/44.1kHz) and 320kbps MP3.
+
+--------------------------------------------------------------------------------
+5. VISUAL IDENTITY, THEME & GLASSMORPHISM DESIGN SYSTEM
+--------------------------------------------------------------------------------
+- Background: Deep Midnight `#090914` with layered ambient gradients (`#15112B`, `#1F1338`).
+- Accent Colors:
+  * Electric Purple: `#8B5CF6`
+  * Neon Violet: `#A855F7`
+  * Cyan Blue: `#22D3EE`
+  * Magenta / Hot Pink: `#EC4899`
+  * Warm Orange: `#FB923C`
+  * Golden Yellow: `#FACC15`
+  * Soft White: `#F8FAFC`
+  * Muted Secondary Text: `#A1A1B5`
+- Glassmorphism Treatment:
+  * Translucent background cards: `Color(0x2215112B)` to `Color(0x331E1B4B)`
+  * Glowing border outlines: 1.dp borders with soft gradient brush (Cyan to Electric Purple)
+  * Elevated control panels with M3 tonal elevation and tactile rotary dials
+- Typography:
+  * Brand & Studio Titles: Gradient text headers with strong weights
+  * Body & Meters: High-contrast monospace and clean legible sans-serif for numbers & timecodes
+
+--------------------------------------------------------------------------------
+6. IMPLEMENTATION ROADMAP & DEVELOPMENT PHASES
+--------------------------------------------------------------------------------
+- Phase 1: Core Design System, Theme Tokens, Glassmorphic Surfaces, and Navigation Graph.
+- Phase 2: Project Management State Engine (Create, Load, Save, Stems Repository).
+- Phase 3: Dashboard Screen with 3 Interactive Workspace Cards and Recent Projects.
+- Phase 4: Sam Vocal Studio (Waveform timeline, multi-lane controls, choir/harmony dialogs).
+- Phase 5: Sam Mix Studio (Mixer channel strips, stem upload, prompt refiner, recommendations).
+- Phase 6: Sam Mastering Studio (Loudness meter cards, 7 profiles, A/B toggle, export dialog).
+- Phase 7: Gemini AI prompt enhancement & audio engineering analysis integration.
+- Phase 8: Verification, compilation, and unit testing.
+================================================================================

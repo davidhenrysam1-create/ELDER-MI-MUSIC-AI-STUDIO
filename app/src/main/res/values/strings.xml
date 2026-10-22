@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Elder-Mi Music</string>
+    <string name="full_app_name">Elder Mi Music AI Studio</string>
+    <string name="slogan">Your Sound. Your Culture. Your Studio.</string>
+    <string name="vocal_studio_name">Sam Vocal Studio</string>
+    <string name="mix_studio_name">Sam Mix Studio</string>
+    <string name="mastering_studio_name">Sam Mastering Studio</string>
+</resources>
