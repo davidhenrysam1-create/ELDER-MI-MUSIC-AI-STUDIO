@@ -3,6 +3,18 @@ ELDER MI MUSIC AI STUDIO — ARCHITECTURE, SPECIFICATION & IMPLEMENTATION PLAN
 "Your Sound. Your Culture. Your Studio."
 ================================================================================
 
+================================================================================
+NOTE (v1.0 WEB REBUILD)
+--------------------------------------------------------------------------------
+This document is the original planning text for an Android/Kotlin prototype.
+The shipped application is a Next.js/TypeScript web studio (see README.md and
+docs/ARCHITECTURE.md). The three studio names, brand identity, colour system and
+functional intent below are preserved; the platform, stack and implementation
+details were superseded because the prototype could not build in the target
+environment and simulated audio results (see README section 1).
+================================================================================
+
+
 1. EXECUTIVE OVERVIEW & PLATFORM OBJECTIVE
 --------------------------------------------------------------------------------
 Elder Mi Music AI Studio is a professional, interactive, AI-powered music production

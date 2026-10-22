@@ -1,0 +1,40 @@
+import { getSettings, purgeAllData, updateSettings } from "@/lib/server/repo";
+import { storageUsage } from "@/lib/server/db";
+import { asNumber, asString, jsonError } from "@/lib/server/validation";
+import type { StudioSettings } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  return Response.json({
+    settings: await getSettings(),
+    storage: await storageUsage(),
+  });
+}
+
+export async function PATCH(request: Request) {
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return jsonError("Invalid JSON body");
+  const patch: Partial<StudioSettings> = {};
+  if (typeof body.defaultExportFormat === "string") {
+    const f = asString(body.defaultExportFormat, "wav24");
+    if (!["wav24", "wav16", "mp3_320"].includes(f)) return jsonError("Unknown export format");
+    patch.defaultExportFormat = f as StudioSettings["defaultExportFormat"];
+  }
+  if (typeof body.autoSave === "boolean") patch.autoSave = body.autoSave;
+  if (typeof body.dither16Bit === "boolean") patch.dither16Bit = body.dither16Bit;
+  if (typeof body.processingQuality === "string") {
+    const q = asString(body.processingQuality, "balanced");
+    if (!["fast", "balanced", "high"].includes(q)) return jsonError("Unknown quality level");
+    patch.processingQuality = q as StudioSettings["processingQuality"];
+  }
+  if (body.maxUploadMb != null) patch.maxUploadMb = Math.round(asNumber(body.maxUploadMb, 80, 5, 500));
+  const settings = await updateSettings(patch);
+  return Response.json({ settings });
+}
+
+/** Data deletion control: wipes projects, audio, exports and metadata. */
+export async function DELETE() {
+  await purgeAllData();
+  return Response.json({ ok: true });
+}

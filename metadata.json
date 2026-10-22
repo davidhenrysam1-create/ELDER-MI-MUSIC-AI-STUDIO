@@ -1,8 +1,0 @@
-{
-  "name": "Elder-Mi Music",
-  "description": "Afrobeats & African music studio for vocal arrangements, stem mixing, and mastering with AI co-production",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
