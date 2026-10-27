@@ -206,6 +206,24 @@ passcode hash, expiry, revoke timestamp, counters). `Project`, `ExportRecord` an
 - Counters (`opens`, `downloads`, `lastOpenedAt`) are incremented on stream start and on successful
   download only. Nothing else about the visitor is stored.
 
+## 5d0. Open studio mode (`lib/server/auth.ts`, `middleware.ts`)
+
+`STUDIO_ACCOUNTS` unset (the default) means **open studio**:
+
+- `currentUser()` returns `openStudioOwner()` — one owner account (`ADMIN_EMAIL`, or
+  `studio@elder-mi.local`), created on first use with all four roles, a `studio` handle and admin rights.
+  Projects saved before the owner existed are claimed with `claimOrphans()`, the same helper the first
+  sign-up uses, so nothing is stranded.
+- Because every guard (`guard`, `guardStudio`, `guardAnyStudio`, `adminGuard`) funnels through
+  `requireUser()`, all of them pass in open mode without a single condition inside the routes.
+- `middleware.ts` skips the session check and forwards `/login`, `/signup`, `/admin-bootstrap` and
+  `/welcome` to `/`. That is what removes the sign-in screen rather than merely hiding its link.
+- `/api/auth/me` reports `openStudio: true`; the shell hides "Sign out" and labels the account entry
+  *Studio profile*.
+
+`STUDIO_ACCOUNTS=on` restores the accounts system described below, unchanged: sessions, per-account
+ownership, suspension, verification and the admin console all still exist in the same modules.
+
 ## 5d. Roles, admin and Google sign-in (`lib/roles.ts`, `lib/server/auth.ts`, `lib/server/google.ts`, `lib/server/email.ts`)
 
 **Roles** live on the account (`AccountRole[]`, one or more of `artist | producer | engineer | promoter`)

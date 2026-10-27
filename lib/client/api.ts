@@ -108,6 +108,8 @@ export interface MeResponse {
   sessions: SessionSummary[];
   signupOpen: boolean;
   allowSignupEnv: boolean;
+  /** True when the app runs as one open studio, with no sign-in screen. */
+  openStudio?: boolean;
   /** Whether Google OAuth has credentials, with the reason when it does not. */
   google?: { configured: boolean; reason: string };
   adminSignIn?: {

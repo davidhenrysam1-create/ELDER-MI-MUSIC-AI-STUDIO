@@ -55,6 +55,11 @@ interface StudioContextValue {
   user: AccountUser | null;
   /** True when the studio accepts new accounts. */
   signupOpen: boolean;
+  /**
+   * True when the app runs as one open studio (no sign-in screen).
+   * The sign-in/sign-out affordances are hidden in that mode.
+   */
+  openStudio: boolean;
   /** Sign out and return to the login screen. */
   signOut: () => Promise<void>;
   ready: boolean;
@@ -144,6 +149,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AccountUser | null>(null);
   const [signupOpen, setSignupOpen] = useState(true);
+  const [openStudio, setOpenStudio] = useState(false);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -201,6 +207,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       ]);
       setUser(sys.user ?? me.user);
       setSignupOpen(me.signupOpen);
+      setOpenStudio(me.openStudio === true);
       setProjects(p.projects);
       setExportsList(e.exports);
       setSettings(sys.settings);
@@ -218,7 +225,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       setLoadError(null);
     } catch (err) {
       // An expired or forged session is not an app error: send the producer to
-      // the sign-in screen with a path back to where they were.
+      // the sign-in screen with a path back to where they were. (An open studio
+      // never answers 401, so this only applies when accounts are switched on.)
       if (err instanceof ApiError && err.status === 401) {
         const next = typeof window !== "undefined" ? window.location.pathname : "/";
         router.replace(`/login?next=${encodeURIComponent(next)}`);
@@ -240,9 +248,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       await api.logout();
     } finally {
       setUser(null);
-      router.replace("/login");
+      // In an open studio there is no login screen to return to; reloading the
+      // dashboard is the honest equivalent of "start again".
+      router.replace(openStudio ? "/" : "/login");
+      if (openStudio) router.refresh();
     }
-  }, [router]);
+  }, [router, openStudio]);
 
   const flushSave = useCallback(async () => {
     const target = pendingRef.current.project;
@@ -754,6 +765,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       signupOpen,
+      openStudio,
       signOut,
       ready,
       loading,

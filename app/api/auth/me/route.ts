@@ -13,6 +13,7 @@ import {
   endSession,
   guard,
   listSessions,
+  openStudioMode,
   normalizeUser,
   updateProfile,
   type PublicUser,
@@ -36,6 +37,11 @@ export async function GET() {
     user,
     sessions: user ? await listSessions(user.id) : [],
     signupOpen: await signupOpen(),
+    /**
+     * Open studio: one shared studio, no sign-in screen. The client hides the
+     * sign-in/sign-out affordances instead of offering a door that is not there.
+     */
+    openStudio: openStudioMode(),
     allowSignupEnv: (process.env.ALLOW_SIGNUP ?? "true").toLowerCase() !== "false",
     // Sign-in options are reported so the screens can be honest about what works
     // instead of showing a Google button that cannot complete.

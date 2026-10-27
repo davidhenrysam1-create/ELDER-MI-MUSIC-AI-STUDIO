@@ -200,10 +200,29 @@ How to try it safely:
 
 ## 5c. Accounts, sign-in and sharing
 
-The studio is now **multi-account on your own server**. Each account sees only its own projects,
-audio, exports, voice profiles and share links.
+### Open studio — the current mode (no sign-in screen)
 
-### Signing in
+The app now opens **straight into the studio**. There is no login screen: every studio, project,
+export, share link, the public pages and `/admin` are reachable the moment you open the address.
+
+How it works, exactly:
+
+- the server acts as **one owner account** (`ADMIN_EMAIL`, created automatically on first use, with all
+  four roles and a public handle), so publishing, likes, follows, downloads and the admin console have a
+  real account to attribute work to — nothing is faked as "anonymous";
+- sign-in screens are not merely unlinked, they **forward to the dashboard**, so a typed `/login`,
+  `/signup`, `/admin-bootstrap` or `/welcome` lands on `/`;
+- the "Sign out" button is hidden, since there is no door to go through.
+
+To go back to per-person accounts, set **`STUDIO_ACCOUNTS=on`** and restart. Nothing is deleted or
+migrated in either direction: every account, password, session and project stays where it is, the login
+and sign-up screens return, and each person sees only their own library again. The whole accounts
+system below is still in the codebase and still tested.
+
+### Signing in (only when `STUDIO_ACCOUNTS=on`)
+
+The studio is **multi-account on your own server**. Each account sees only its own projects, audio,
+exports, voice profiles and share links.
 
 | Screen | What it does |
 | --- | --- |
@@ -357,6 +376,7 @@ Copy `.env.example` to `.env.local`:
 | `GEMINI_MODEL` | Optional, default `gemini-2.5-flash`. |
 | `DATA_DIR` | Optional private data directory (default `./.data`). |
 | `ADMIN_EMAIL` | **Required for admin access.** The one address that always has admin rights. Leave it empty and nobody can open `/admin`. |
+| `STUDIO_ACCOUNTS` | Optional. Leave unset for **open studio** (no sign-in screen, everything reachable as the owner). Set to `on` to restore the login screen, sign-up and per-person libraries. |
 | `ADMIN_BOOTSTRAP_CODE` | Optional. Fixed one-time admin code while Google is unconfigured; random and printed to the log if unset. |
 | `ADMIN_PASSWORD` | Optional (8+ chars). Seeds the admin's password once so `/login` works with `ADMIN_EMAIL` + this password; change it in My account afterwards. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Turns on **Continue with Google**. Add `/api/auth/google/callback` as an authorised redirect URI (see below). |
