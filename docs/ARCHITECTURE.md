@@ -257,6 +257,36 @@ with a 24-hour expiry (`issueVerificationToken()`, `confirmEmail()`).
 the three social links and the join date. `getPublicProfile()` returns `null` for suspended accounts and
 the response explicitly reports `published: []` / `publishingAvailable: false` — nothing is invented.
 
+## 5e. Publishing, likes and follows (`lib/server/social.ts`)
+
+**Model** (schema version 3): `Release` (owner, source project + asset, title, description, genre/bpm/key,
+`visibility: public|unlisted`, `allowDownload`, `plays`, `downloads`), `Follow` (follower → following) and
+`Like` (account → release). `migrate()` backfills all three arrays, so an older database starts with
+nothing published — the safe default.
+
+**Rules enforced server-side**
+
+- `publishRelease()` requires `canPublish(roles)` (artist, producer, promoter — administrators pass), a
+  handle, and ownership of both the project and the asset, resolved through `getProject(id, ownerId)`.
+  One release per project: publishing again updates it, so the feed cannot fill with duplicates.
+- `releaseCard()` re-derives the creator from `users`, returns `null` for suspended creators, and refuses
+  an unlisted release unless the viewer owns it. Counters are recomputed from `likes` every time rather
+  than cached on the row.
+- `discover()` filters visibility first, then applies `scope` (`following` needs an account and 401s
+  without one), genre and a case-insensitive search over title, creator name, handle and genre.
+- `toggleLike()` / `toggleFollow()` are idempotent toggles that return the resulting state and a count
+  read back from the table, so the UI never shows an optimistic number.
+- `releaseAudio()` is the only path to the bytes: streaming an unlisted release is allowed for anyone
+  holding the link (that is what unlisted means), downloading requires `allowDownload` (403), a signed-in
+  account (401) and, for unlisted releases, ownership. Bytes are read from the owner's project, so a
+  release whose file was deleted 404s instead of serving a broken player.
+- Play counting happens in the audio route through `isFirstFetch()` (`lib/server/stream.ts`): a request
+  with no `Range` header, or one starting at byte 0, counts one play; seeking does not.
+
+**Privacy boundary:** a release exposes one audio file plus the creator's public profile facts. The
+project document — mixer, mastering chain, stems, versions and every other asset — is never serialised
+into a release response, and `/u/<handle>` never includes an email address.
+
 ## 6. API surface
 
 | Route | Methods | Notes |
@@ -268,7 +298,13 @@ the response explicitly reports `published: []` / `publishingAvailable: false` �
 | `/api/auth/verify/send`, `/api/auth/verify/confirm` | POST, GET | issue a token / confirm the link |
 | `/api/admin/users` | GET | admin: all accounts plus per-account stats |
 | `/api/admin/users/:id` | PATCH, DELETE | admin: roles, verify, suspend, delete |
-| `/api/profile/:handle` | GET | public profile; no email, no moderation fields |
+| `/api/profile/:handle` | GET | public creator page: profile, releases, counts, viewer state |
+| `/api/releases` | GET, POST | discover / following / mine; publish a finished file |
+| `/api/releases/:id` | GET, PATCH, DELETE | read / edit listing / unpublish (owner) |
+| `/api/releases/:id/like` | POST | toggle a like, returns the real count |
+| `/api/releases/:id/audio` | GET | stream a published song with ranges, counts a play |
+| `/api/releases/:id/download` | GET | download (account + creator permission), counts once |
+| `/api/creators/:handle/follow` | POST | toggle a follow, returns the real follower count |
 | `/api/projects` | GET, POST | list / create |
 | `/api/projects/:id` | GET, PATCH, DELETE | patch ignores `id`/`createdAt`; DELETE removes files |
 | `/api/projects/:id/assets` | POST | multipart; extension, size, duration validation; optional channel creation |

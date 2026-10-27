@@ -124,6 +124,53 @@ export interface AdminUserRow {
   stats: { userId: string; projects: number; assets: number; bytes: number; shares: number };
 }
 
+/** A creator's public facts, as shown on `/u/<handle>`. */
+export interface CreatorSummary {
+  id: string;
+  name: string;
+  handle: string | null;
+  roles: AccountRole[];
+  isAdmin: boolean;
+}
+
+/** One published song, hydrated for the UI. */
+export interface ReleaseCard {
+  id: string;
+  title: string;
+  description: string;
+  genre: string;
+  bpm: number;
+  musicalKey: string;
+  allowDownload: boolean;
+  visibility: "public" | "unlisted";
+  plays: number;
+  downloads: number;
+  likeCount: number;
+  likedByViewer: boolean;
+  followingCreator: boolean;
+  isOwn: boolean;
+  createdAt: string;
+  updatedAt: string;
+  creator: CreatorSummary;
+  audioUrl: string;
+  durationSec: number;
+}
+
+/** `/api/profile/<handle>` response. */
+export interface CreatorPageData {
+  profile: CreatorSummary & {
+    bio: string;
+    links: Record<string, string>;
+    joinedAt: string;
+  };
+  releases: ReleaseCard[];
+  followers: number;
+  following: number;
+  followingViewer: boolean;
+  /** Whether the visitor has an account; needs one to like, follow or download. */
+  signedIn: boolean;
+}
+
 export interface AdminOverview {
   users: AccountUser[];
   stats: { userId: string; projects: number; assets: number; bytes: number; shares: number }[];
@@ -225,6 +272,58 @@ export const api = {
       method: "DELETE",
       body: JSON.stringify(body),
     }),
+
+  /* ---------------- publishing, likes and follows ---------------- */
+  releases: (options: { scope?: "all" | "following" | "mine"; genre?: string; q?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (options.scope) params.set("scope", options.scope);
+    if (options.genre) params.set("genre", options.genre);
+    if (options.q) params.set("q", options.q);
+    if (options.limit) params.set("limit", String(options.limit));
+    const query = params.toString();
+    return jsonFetch<{ releases: ReleaseCard[]; signedIn?: boolean }>(
+      `/api/releases${query ? `?${query}` : ""}`,
+    );
+  },
+  publishRelease: (body: {
+    projectId: string;
+    assetId: string;
+    title: string;
+    description?: string;
+    visibility?: "public" | "unlisted";
+    allowDownload?: boolean;
+  }) =>
+    jsonFetch<{ release: ReleaseCard }>("/api/releases", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateRelease: (
+    id: string,
+    patch: {
+      title?: string;
+      description?: string;
+      visibility?: "public" | "unlisted";
+      allowDownload?: boolean;
+    },
+  ) =>
+    jsonFetch<{ release: ReleaseCard }>(`/api/releases/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  unpublishRelease: (id: string) =>
+    jsonFetch<{ ok: true }>(`/api/releases/${id}`, { method: "DELETE" }),
+  likeRelease: (id: string) =>
+    jsonFetch<{ liked: boolean; likeCount: number }>(`/api/releases/${id}/like`, {
+      method: "POST",
+    }),
+  followCreator: (handle: string) =>
+    jsonFetch<{ following: boolean; followers: number }>(
+      `/api/creators/${encodeURIComponent(handle)}/follow`,
+      { method: "POST" },
+    ),
+  creatorPage: (handle: string) =>
+    jsonFetch<CreatorPageData>(`/api/profile/${encodeURIComponent(handle)}`),
+  downloadUrl: (releaseId: string) => `/api/releases/${releaseId}/download`,
 
   /* ---------------- sharing ---------------- */
   shares: () => jsonFetch<{ shares: ShareSummary[] }>("/api/shares"),

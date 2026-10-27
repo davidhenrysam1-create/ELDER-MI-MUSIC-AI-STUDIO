@@ -75,11 +75,18 @@ export const CAPABILITIES: Capability[] = [
       "`/u/<handle>` shows a creator's name, roles, bio and AudioMack / Instagram / Facebook links without revealing an email address. Whether a page exists at all is the creator's choice.",
   },
   {
-    name: "Published songs, follows, likes and downloads",
+    name: "Publish a song, with likes, follows and downloads",
+    area: "Platform",
+    status: "ready",
+    detail:
+      "Publish a finished file from one of your projects: public (Discover) or unlisted (your page only), listen-only or downloadable. Listeners can like, follow the creator and download when allowed; plays, downloads, likes and followers are real counts. The project, mixer and stems stay private.",
+  },
+  {
+    name: "Comments, paid support and notifications",
     area: "Platform",
     status: "planned",
     detail:
-      "Not built yet. Today a finished song travels as a revocable share link. Publishing, a follower graph, likes and download counters are labelled planned wherever they are mentioned.",
+      "Not built. There is no comment thread, no tipping/subscription and no email or push notification when someone follows or likes you. The UI labels these as planned.",
   },
   {
     name: "Password reset by email",

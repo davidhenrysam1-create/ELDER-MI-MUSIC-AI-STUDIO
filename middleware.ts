@@ -31,11 +31,19 @@ const PUBLIC_FILES = [
   "/apple-icon.png",
 ];
 /**
- * APIs that work without a session. `/api/auth/` contains the sign-in routes
- * themselves; `/api/share/` serves a shared link; `/api/profile/` is the public
- * creator page. Everything else is refused before it reaches a handler.
+ * APIs that work without a session.
+ *
+ *  - `/api/auth/`     — the sign-in routes themselves;
+ *  - `/api/share/`    — a friend's private link;
+ *  - `/api/profile/`  — a creator's public page;
+ *  - `/api/releases`  — published songs: reading and streaming is public,
+ *                       while writing, liking and downloading re-check the
+ *                       session inside their own handlers (`guard()`), so
+ *                       letting the request through here cannot bypass auth.
+ *
+ * Everything else is refused before it reaches a handler.
  */
-const PUBLIC_API = ["/api/auth/", "/api/share/", "/api/profile/"];
+const PUBLIC_API = ["/api/auth/", "/api/share/", "/api/profile/", "/api/releases", "/api/creators"];
 
 function safeEqual(a: string, b: string) {
   if (a.length !== b.length) return false;

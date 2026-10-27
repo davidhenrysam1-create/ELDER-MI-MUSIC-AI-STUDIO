@@ -570,6 +570,12 @@ export interface Database {
   users: User[];
   sessions: SessionRecord[];
   shares: ShareLink[];
+  /** Published songs — the public face of a finished piece of audio. */
+  releases: Release[];
+  /** Creator → creator edges. */
+  follows: Follow[];
+  /** Account → release likes. */
+  likes: Like[];
   projects: Project[];
   exports: ExportRecord[];
   voiceProfiles: VoiceProfile[];
@@ -578,6 +584,61 @@ export interface Database {
   generations: GenerationJob[];
   /** Running total of estimated provider spend, used to enforce the cap. */
   spend: { lifetimeUsd: number };
+}
+
+/* ------------------------------------------------------------------ */
+/* Publishing: releases, follows, likes                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One song, published.
+ *
+ * A release points at a finished audio object inside the owner's own project.
+ * It does **not** expose the project: the mixer, mastering chain, other stems
+ * and any unpublished audio stay private. Unpublishing removes it from the
+ * public site without touching the project.
+ */
+export interface Release {
+  id: string;
+  ownerId: string;
+  /** Project the audio came from; used only for ownership checks. */
+  projectId: string;
+  /** The published file (a master, a bounce, a beat). */
+  assetId: string;
+  title: string;
+  genre: Genre;
+  bpm: number;
+  musicalKey: string;
+  description: string;
+  /** Listeners may download the file; each download is counted. */
+  allowDownload: boolean;
+  /**
+   * `public` appears in Discover; `unlisted` is reachable only from the
+   * creator's page, for a song that is finished but not announced yet.
+   */
+  visibility: ReleaseVisibility;
+  plays: number;
+  downloads: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReleaseVisibility = "public" | "unlisted";
+
+/** A directed "follow" edge. Unfollowing deletes the row. */
+export interface Follow {
+  id: string;
+  followerId: string;
+  followingId: string;
+  createdAt: string;
+}
+
+/** A like on a release. One row per account per release. */
+export interface Like {
+  id: string;
+  userId: string;
+  releaseId: string;
+  createdAt: string;
 }
 
 /* ------------------------------------------------------------------ */

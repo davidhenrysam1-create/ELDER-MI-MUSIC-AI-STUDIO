@@ -7,7 +7,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { GlassCard, GradientText, StatusPill, Toasts, cn, Modal, ProgressBar } from "@/components/ui/primitives";
 import { GlobalPlayer } from "@/components/audio/GlobalPlayer";
 import { useStudio } from "@/lib/client/studio";
-import { canAdminister, canOpenRoute, canUseStudio, describeRoles } from "@/lib/roles";
+import { canAdminister, canOpenRoute, canPublish, canUseStudio, describeRoles } from "@/lib/roles";
 import type { AccountRole } from "@/lib/types";
 import { isPublicPath } from "@/lib/routes";
 import { formatBytes, relativeTime } from "@/lib/format";
@@ -21,6 +21,8 @@ interface NavItem {
   studio?: "vocal" | "mix" | "master";
   /** Shown only to the studio admin. */
   admin?: boolean;
+  /** Shown only to roles that can publish (artist, producer, promoter). */
+  publish?: boolean;
 }
 
 /**
@@ -37,6 +39,8 @@ const NAV: NavItem[] = [
   { href: "/vocal", label: "Sam Vocal Studio", icon: "mic", studio: "vocal" },
   { href: "/mix", label: "Sam Mix Studio", icon: "sliders", studio: "mix" },
   { href: "/mastering", label: "Sam Mastering Studio", icon: "disc", studio: "master" },
+  { href: "/discover", label: "Discover", icon: "music" },
+  { href: "/publish", label: "Publish a song", icon: "upload", publish: true },
   { href: "/projects", label: "My Projects", icon: "folder" },
   { href: "/voice-profiles", label: "My Voice Profiles", icon: "voice" },
   { href: "/exports", label: "Export History", icon: "download" },
@@ -92,6 +96,7 @@ function visibleFor(
 ): boolean {
   if (!user) return true;
   if (item.admin) return canAdminister(user.isAdmin);
+  if (item.publish) return canPublish(user.roles as never, user.isAdmin === true);
   if (!item.studio) return true;
   // The nav uses "master" as its route key; the role map calls it "mastering".
   const studio = item.studio === "master" ? "mastering" : item.studio;

@@ -60,7 +60,12 @@ describe("project persistence", () => {
   it("writes valid JSON to disk after each mutation", async () => {
     const raw = await readFile(path.join(tmpDir, "db.json"), "utf8");
     const parsed = JSON.parse(raw);
-    expect(parsed.version).toBe(2);
+    // Schema 3 added releases/follows/likes; the store must keep the number in
+    // step with `migrate()` so an older database is upgraded on read.
+    expect(parsed.version).toBeGreaterThanOrEqual(3);
+    expect(Array.isArray(parsed.releases)).toBe(true);
+    expect(Array.isArray(parsed.follows)).toBe(true);
+    expect(Array.isArray(parsed.likes)).toBe(true);
     expect(Array.isArray(parsed.projects)).toBe(true);
   });
 

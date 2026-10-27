@@ -335,20 +335,41 @@ export default function DocsPage() {
 
       <GlassCard>
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <h2 className="text-base font-semibold text-softwhite">Public creator pages</h2>
-          <StatusPill tone="warning" icon="eye">
-            Partially implemented
+          <h2 className="text-base font-semibold text-softwhite">Publishing, likes and follows</h2>
+          <StatusPill tone="success" icon="music">
+            Implemented
           </StatusPill>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          <span className="mono">/u/&lt;handle&gt;</span> shows a creator&apos;s name, roles, bio and
-          AudioMack / Instagram / Facebook links without signing in, and never reveals an email address.
+          <span className="mono">/publish</span> turns one finished file from your project into a song
+          other accounts can play. <span className="mono">/discover</span> lists what the studio has
+          published, and <span className="mono">/u/&lt;handle&gt;</span> is a creator&apos;s public page
+          with their songs, follower counts and AudioMack / Instagram / Facebook links.
         </p>
-        <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
-          <span className="text-softwhite">Not built yet:</span> published songs on that page, follows,
-          likes and download counters. Those are labelled planned in the app rather than displayed empty;
-          finished songs travel as revocable share links today.
-        </p>
+        <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-muted">
+          <li>
+            <span className="text-softwhite">Public or unlisted:</span> public songs appear in Discover;
+            unlisted songs live only on your page, for something finished but not announced. Either can
+            be unpublished without touching the project.
+          </li>
+          <li>
+            <span className="text-softwhite">Listen, like, follow:</span> one row per account, so counters
+            rise and fall honestly. Plays count when a listener presses play — not on page load, and not
+            while seeking.
+          </li>
+          <li>
+            <span className="text-softwhite">Downloads</span> need the creator&apos;s permission and a
+            signed-in account; each one is counted. Listen-only is the default.
+          </li>
+          <li>
+            <span className="text-softwhite">Still private:</span> the project behind a song — mixer,
+            mastering chain, stems, versions and every unpublished file.
+          </li>
+          <li>
+            <span className="text-softwhite">Not built:</span> comments, paid support/tips and
+            like/follow notifications. They are labelled planned in the app, not shown empty.
+          </li>
+        </ul>
       </GlassCard>
 
       <GlassCard>
