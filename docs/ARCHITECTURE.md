@@ -102,6 +102,61 @@ verification. Solo logic is explicit (any solo → only soloed channels).
   values. Unknown keys/out-of-range numbers are discarded (`sanitizeSettings`).
 - Neither path receives audio. Neither invents measurements.
 
+## 5b. Music generation (`lib/server/providers/*`, `lib/server/generation.ts`)
+
+The only place the studio *creates* audio rather than processing yours.
+
+**Adapter contract** (`lib/server/providers/types.ts`)
+
+```ts
+interface MusicProvider {
+  descriptor(): ProviderDescriptor;                 // public, recomputed per call
+  start(request): Promise<ProviderStart>;           // "ready" | "pending"
+  poll(providerJobId, request): Promise<ProviderStart>;
+  cancel?(providerJobId): Promise<void>;            // async providers only
+}
+```
+
+- `descriptor().configured` is derived **only** from environment variables, so the UI cannot claim a
+  provider works when it has no key.
+- Failures throw `ProviderError { message, status, retryable }`. The vendor's own wording is preserved
+  and shown in the job list; 429/5xx/timeouts are `retryable`, auth and validation errors are not.
+- `http.ts` wraps `fetch` with a timeout (60 s default, 120–240 s per adapter), an AbortController,
+  JSON/bytes readers, empty-body detection and `ProviderError` mapping.
+
+**Adapters**
+
+| File | Provider | Shape | Notes |
+| --- | --- | --- | --- |
+| `lyria.ts` | Google Lyria 2 (`lyria-002`, Vertex `:predict`) | synchronous | base64 WAV in `predictions[0]`; caps at 30 s; credential = API key or access token + project |
+| `stableAudio.ts` | Stability Stable Audio 2 | synchronous | multipart form → raw WAV body; path configurable via `STABLE_AUDIO_PATH` |
+| `elevenlabs.ts` | ElevenLabs Music (`music_v1`) | synchronous | JSON → MP3 body; length in ms; kind folded into the prompt |
+| `replicate.ts` | MusicGen (`meta/musicgen`) | asynchronous | create prediction → poll → download the delivery URL; `cancel` posts `/cancel` |
+
+**Orchestration** (`lib/server/generation.ts`)
+
+1. Validate: project exists, descriptor configured, kind supported, prompt 6–600 chars, duration
+   clamped to the adapter's max.
+2. Budget gates run **before** any network call: `allowPaidGeneration === false` → 403; estimate +
+   `spend.lifetimeUsd > spendCapUsd` → 402.
+3. Persist a `GenerationJob`, call `start`. `ready` → store; `pending` → job stays `running` with the
+   provider's handle.
+4. `storeResult` writes the bytes to private storage, decodes WAV for real peaks/duration (`MP3` has no
+   server decoder, so peaks stay empty until the browser plays it), builds the `AssetMeta` with
+   `provenance`, appends a mixer channel (`makeTrack`), promotes the first generated vocal to the
+   vocal source, charges the spend ledger and marks the job complete.
+5. Runtime failures mark the job `failed` with the vendor message and charge nothing. Cancelling a
+   pending job clears it with no charge.
+
+**Client** — `components/studio/GeneratePanel.tsx` reads `GET /api/providers` (catalogue + spend), shows
+the live estimate from `estimateUsdPerSecond`, then `POST /api/generate` and polls
+`GET /api/generate/:id` every 4 s for asynchronous providers. With no key, it renders setup
+instructions instead of a generate button.
+
+**Money model** — costs are estimates from `*_USD_PER_SEC` (defaults: Lyria 0.002, Stable Audio 0.0015,
+ElevenLabs 0.01, MusicGen 0.0009 USD/s) rounded to cents, stored in `db.spend.lifetimeUsd`. They are
+tracked, not billed: the vendor invoice is authoritative and every screen says so.
+
 ## 6. API surface
 
 | Route | Methods | Notes |
@@ -120,7 +175,10 @@ verification. Solo logic is explicit (any solo → only soloed channels).
 | `/api/prompt/improve` | POST | Gemini or labelled local engine |
 | `/api/mix/recommendations` | POST | validated recommendation stages |
 | `/api/system` | GET | providers, engines, storage, settings |
-| `/api/settings` | GET, PATCH, DELETE | defaults / purge |
+| `/api/settings` | GET, PATCH, DELETE | defaults / purge; `allowPaidGeneration`, `spendCapUsd` |
+| `/api/providers` | GET | generation catalogue, licence, cost estimate, spend summary |
+| `/api/generate` | GET, POST | list jobs / create (budget-gated, 403/402/400) |
+| `/api/generate/:id` | GET, DELETE | advance a pending job / cancel and charge nothing |
 
 ## 7. UI system
 
@@ -129,7 +187,7 @@ verification. Solo logic is explicit (any solo → only soloed channels).
 - `components/audio/*`: canvas waveform (real peaks, keyboard-seekable), upload zone with
   validation feedback, section overlay, transport.
 - `components/studio/*`: prompt editor with labelled results, analysis panel, mixer strips and
-  faders, job runner + status card, asset pickers, project gate.
+  faders, job runner + status card, asset pickers, project gate, generation panel.
 - Design tokens live in `tailwind.config.ts` and `app/globals.css` (glass surfaces, gradients,
   focus rings, reduced-motion support).
 
@@ -158,5 +216,10 @@ One codebase serves every screen size; there is no separate mobile build.
   layer.
 - Rendering happens on the client device, so a phone is slower than a laptop for long bounces; the
   render section selector exists for that.
+- Generated audio quality and licensing are the vendor's; the licence string is stored per asset but the
+  studio cannot verify your plan or territory. Read the provider terms before release.
+- Cost figures are estimates from published per-second prices, not a billing integration; a job that
+  fails after the vendor charges you is not reconciled.
+- No local model ships. Offline, the Generate panel is inert and the local DSP is unaffected.
 - Access control is a single optional Basic-auth gate (`STUDIO_PASSWORD`). It is not a user system:
   no roles, sessions, per-user libraries or audit trail.

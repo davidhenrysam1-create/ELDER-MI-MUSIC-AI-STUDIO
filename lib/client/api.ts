@@ -1,12 +1,40 @@
 import type {
   AssetMeta,
   ExportRecord,
+  GenerationJob,
+  GenerationKind,
+  MusicProviderId,
   Project,
   ProjectVersion,
   StudioId,
   StudioSettings,
   VoiceProfile,
 } from "@/lib/types";
+import type { ProviderDescriptor } from "@/lib/server/providers/types";
+
+/** Shape of `GET /api/providers`. */
+export interface ProviderCatalogue {
+  providers: ProviderDescriptor[];
+  summary: {
+    total: number;
+    configured: number;
+    usableKinds: GenerationKind[];
+    note: string;
+  };
+  spend: {
+    lifetimeUsd: number;
+    capUsd: number;
+    allowPaidGeneration: boolean;
+    remainingUsd: number;
+  };
+  settings: { allowPaidGeneration: boolean; spendCapUsd: number };
+}
+
+/** Result of creating or polling a generation. */
+export interface GenerationOutcome {
+  job: GenerationJob;
+  asset: AssetMeta | null;
+}
 
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -83,9 +111,46 @@ export const api = {
       providers: {
         gemini: { configured: boolean; model: string };
         voiceConversion: { configured: boolean; note: string };
+        /** One entry per generation adapter; empty is fine. */
+        generation?: ProviderDescriptor[];
+        generationSummary?: {
+          total: number;
+          configured: number;
+          usableKinds: GenerationKind[];
+          note: string;
+        };
+      };
+      spend?: {
+        lifetimeUsd: number;
+        capUsd: number;
+        allowPaidGeneration: boolean;
+        remainingUsd: number;
       };
       engines: Record<string, string>;
     }>("/api/system"),
+  providers: () => jsonFetch<ProviderCatalogue>("/api/providers"),
+  /** Start a generation. Provider failures come back as a failed job. */
+  createGeneration: (body: {
+    projectId: string;
+    providerId: MusicProviderId;
+    kind: GenerationKind;
+    prompt: string;
+    negativePrompt?: string;
+    durationSec: number;
+    seed?: number;
+  }) =>
+    jsonFetch<GenerationOutcome>("/api/generate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  /** Advance a pending job by one provider poll. */
+  generation: (id: string) => jsonFetch<GenerationOutcome>(`/api/generate/${id}`),
+  cancelGeneration: (id: string) =>
+    jsonFetch<{ job: GenerationJob }>(`/api/generate/${id}`, { method: "DELETE" }),
+  generations: (projectId?: string) =>
+    jsonFetch<{ jobs: GenerationJob[] }>(
+      `/api/generate${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`,
+    ),
   updateSettings: (patch: Partial<StudioSettings>) =>
     jsonFetch<{ settings: StudioSettings }>("/api/settings", {
       method: "PATCH",

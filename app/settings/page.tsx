@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import {
@@ -13,7 +13,7 @@ import {
   cn,
 } from "@/components/ui/primitives";
 import { useStudio } from "@/lib/client/studio";
-import { api } from "@/lib/client/api";
+import { api, type ProviderCatalogue } from "@/lib/client/api";
 import { formatBytes } from "@/lib/format";
 import { CAPABILITIES, STATUS_LABEL, type CapabilityStatus } from "@/lib/capabilities";
 import type { StudioSettings } from "@/lib/types";
@@ -29,6 +29,32 @@ export default function SettingsPage() {
   const { settings, system, updateSettings, refreshSystem, refreshExports, notify } = useStudio();
   const [uploadLimit, setUploadLimit] = useState(settings?.maxUploadMb ?? 80);
   const [busy, setBusy] = useState(false);
+  // Generation providers come from the server so the list can never drift from
+  // what the API actually supports.
+  const [catalogue, setCatalogue] = useState<ProviderCatalogue | null>(null);
+  const [catalogueError, setCatalogueError] = useState<string | null>(null);
+  const [capInput, setCapInput] = useState<string>(String(settings?.spendCapUsd ?? 5));
+
+  const loadProviders = useCallback(async () => {
+    try {
+      setCatalogue(await api.providers());
+      setCatalogueError(null);
+    } catch (err) {
+      setCatalogueError((err as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProviders();
+  }, [loadProviders]);
+
+  /** Persist the spend cap, clamped to the same 0–500 range as the API. */
+  const saveCap = async () => {
+    const value = Math.max(0, Math.min(500, Number(capInput) || 0));
+    setCapInput(String(value));
+    await patch({ spendCapUsd: value });
+    await loadProviders();
+  };
 
   const patch = async (value: Partial<StudioSettings>) => {
     try {
@@ -124,6 +150,132 @@ export default function SettingsPage() {
               was called.
             </div>
           ) : null}
+        </GlassCard>
+
+
+        {/* -------------------------------------------------------------- *
+         * AI music generation providers                                    *
+         * -------------------------------------------------------------- */}
+        <GlassCard>
+          <SectionHeading
+            eyebrow="AI music generation"
+            title="Music providers"
+            description="These hosted models generate new beats, instrumentals, songs and vocal hooks. Each one is billed by its own vendor, to your own account — the studio only sends the request."
+            action={
+              <StatusPill tone={catalogue?.summary.configured ? "success" : "warning"}>
+                {catalogue
+                  ? `${catalogue.summary.configured}/${catalogue.summary.total} configured`
+                  : "Loading…"}
+              </StatusPill>
+            }
+          />
+
+          <ul className="space-y-2">
+            {(catalogue?.providers ?? []).map((provider) => (
+              <li
+                key={provider.id}
+                className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-white/10 bg-black/20 p-3"
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-softwhite">
+                    {provider.name}{" "}
+                    <span className="text-[9px] font-normal text-muted">{provider.vendor}</span>
+                  </div>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-muted">{provider.note}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted/80">
+                    <span className="mono">{provider.model}</span>
+                    <span>
+                      {provider.kinds.join(" · ")} · max {provider.maxDurationSec}s
+                    </span>
+                    <span className="mono">~${provider.estimateUsdPerSecond.toFixed(3)}/s</span>
+                  </div>
+                  <div className="mt-1 text-[9px] text-muted/70">
+                    Key: <span className="mono">{provider.keyEnv.join(" + ")}</span>
+                  </div>
+                </div>
+                <StatusPill tone={provider.configured ? "success" : "warning"}>
+                  {provider.configured ? "Real" : "Awaiting configuration"}
+                </StatusPill>
+              </li>
+            ))}
+            {catalogueError ? (
+              <li className="text-[10px] text-rose-200">{catalogueError}</li>
+            ) : null}
+          </ul>
+
+          {catalogue && catalogue.summary.configured === 0 ? (
+            <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] p-3 text-[10px] leading-relaxed text-amber-100/85">
+              No generation key is set, so the Generate panel shows setup instructions instead of a
+              button. Add any one of the variables above to{" "}
+              <span className="mono">.env.local</span> and restart the studio — see{" "}
+              <Link href="/docs" className="underline">
+                Docs → Music generation
+              </Link>
+              .
+            </div>
+          ) : null}
+
+          {/* Spend guard: off by default, and a hard cap on top. */}
+          <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-softwhite">Allow paid generation</div>
+                <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+                  Off by default. While off, the generate endpoints refuse every request with{" "}
+                  <span className="mono">403</span> and nothing is billed.
+                </p>
+              </div>
+              <Toggle
+                checked={settings?.allowPaidGeneration ?? false}
+                onChange={(value) => void patch({ allowPaidGeneration: value }).then(loadProviders)}
+                label="Allow paid generation"
+              />
+            </div>
+
+            <div>
+              <label className="label mb-1 block" htmlFor="spend-cap">
+                Spend cap (USD)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="spend-cap"
+                  type="number"
+                  min={0}
+                  max={500}
+                  step={1}
+                  className="field w-28 text-xs"
+                  value={capInput}
+                  onChange={(event) => setCapInput(event.target.value)}
+                />
+                <button className="btn-subtle text-xs" onClick={() => void saveCap()} disabled={busy}>
+                  Save cap
+                </button>
+              </div>
+              <p className="mt-1 text-[9px] leading-relaxed text-muted/70">
+                A request whose estimate would push tracked spend past this cap is refused with{" "}
+                <span className="mono">402</span>. Tracked spend is the studio&apos;s own estimate from
+                published per-second prices — your provider invoice is authoritative.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[10px]">
+              <span className="text-muted">
+                Tracked spend{" "}
+                <span className="mono text-softwhite">
+                  ${(catalogue?.spend.lifetimeUsd ?? 0).toFixed(2)}
+                </span>
+              </span>
+              <span className="text-muted">
+                Cap <span className="mono text-softwhite">${(catalogue?.spend.capUsd ?? 0).toFixed(2)}</span>
+              </span>
+              <span className="text-muted">
+                Left{" "}
+                <span className="mono text-softwhite">
+                  ${(catalogue?.spend.remainingUsd ?? 0).toFixed(2)}
+                </span>
+              </span>
+            </div>
+          </div>
         </GlassCard>
 
         <GlassCard>

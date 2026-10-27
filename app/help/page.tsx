@@ -119,7 +119,23 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Is my audio sent anywhere?",
-    a: "No. Uploads are stored on the studio server you are running and streamed back to your browser. Rendering and measurement happen in your browser. The only outbound requests are text prompts to Gemini, and only if you set GEMINI_API_KEY.",
+    a: "Not for upload, mixing, vocal layering, mastering or export: your files stay on the studio server you run, and rendering plus measurement happen in your browser. Two optional outbound paths exist. Text prompts go to Gemini for prompt improvement / mixing suggestions, only if GEMINI_API_KEY is set. And if you use the Generate panel, your written brief goes to the music provider you picked, which returns a rendered file; that only happens when you press Generate with paid generation enabled.",
+  },
+  {
+    q: "How do I generate a beat, a song or a vocal hook?",
+    a: "Add one generation key to .env.local — GOOGLE_API_KEY + GOOGLE_VERTEX_PROJECT (Lyria 2), STABILITY_API_KEY (Stable Audio 2), ELEVENLABS_API_KEY (ElevenLabs Music) or REPLICATE_API_TOKEN (MusicGen) — and restart the studio. Then open Settings → AI music generation, switch on Allow paid generation and set a small spend cap, and use the Generate panel in Sam Mix Studio (beats, instrumentals) or Sam Vocal Studio (songs, vocal hooks). No key is included with this app: keys are issued by the provider to your own account and billed by them.",
+  },
+  {
+    q: "Why is the Generate panel showing setup instructions instead of a button?",
+    a: "Because no generation key is configured. The panel lists the exact variable each provider needs. It never shows a fake generate button and never produces placeholder audio — with no key there is nothing to render.",
+  },
+  {
+    q: "The Generate button is disabled even though I added a key.",
+    a: "Two more gates are closed. Settings → AI music generation must have Allow paid generation switched on (otherwise the API returns 403), and the estimate for your requested length must fit inside the spend cap (otherwise 402). Raise the cap or shorten the request. Note the cap is checked against the studio's tracked estimate, not the provider's invoice.",
+  },
+  {
+    q: "Are the costs shown on the Generate panel my real bill?",
+    a: "No. They are estimates from configurable per-second prices (defaults in .env.example), rounded to cents and tracked so the spend cap can stop runaway use. Your provider's invoice is authoritative. Every success message and the asset provenance say this explicitly so nobody budgets from the wrong number.",
   },
   {
     q: "Why do the loudness numbers differ from my other meter?",
@@ -163,6 +179,14 @@ const TROUBLESHOOT = [
   {
     symptom: "Prompt improvement says “local-heuristic”",
     fix: "No Gemini key is configured. The local production rule engine produced the result — add GEMINI_API_KEY to .env.local and restart for model-driven output.",
+  },
+  {
+    symptom: "Generate fails with 401 / 403 / 429",
+    fix: "401 means the provider rejected the key — check it in the provider dashboard and restart the studio after editing .env.local. 403 means paid generation is off in Settings. 429 is a rate or quota limit from the vendor; the job message keeps their wording, and the studio retries asynchronous jobs automatically.",
+  },
+  {
+    symptom: "A generated file's waveform is empty",
+    fix: "MP3 output has no server-side decoder, so the stored peaks are empty until the browser plays and decodes the file. WAV output is decoded on the server and shows its real waveform immediately.",
   },
   {
     symptom: "Playback stops when I change pages",

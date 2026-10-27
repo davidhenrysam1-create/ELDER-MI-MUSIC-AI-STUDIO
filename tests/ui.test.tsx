@@ -179,6 +179,8 @@ describe("project defaults consumed by the UI", () => {
   it("serialises a project that the studio pages can render", () => {
     const project: Project = emptyProject("UI Test", "Afrobeats", 104, "F# minor");
     const settings: StudioSettings = {
+      allowPaidGeneration: false,
+      spendCapUsd: 5,
       defaultExportFormat: "wav24",
       dither16Bit: true,
       autoSave: true,

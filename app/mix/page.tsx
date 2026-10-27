@@ -19,6 +19,7 @@ import { PromptEditor } from "@/components/studio/PromptEditor";
 import { AnalysisPanel } from "@/components/studio/AnalysisPanel";
 import { JobStatusCard, useJobRunner } from "@/components/studio/useJobRunner";
 import { MixChannelStrip } from "@/components/studio/MixChannelStrip";
+import { GeneratePanel } from "@/components/studio/GeneratePanel";
 import { UploadZone } from "@/components/audio/UploadZone";
 import { useStudio } from "@/lib/client/studio";
 import { assetChannels, loadAssetBuffer } from "@/lib/client/audio";
@@ -452,6 +453,9 @@ function MixStudio() {
       </div>
 
       {/* Recommendations */}
+      {/* Hosted generation: create a beat or instrumental to mix with. */}
+      <GeneratePanel studio="mix" defaultKind="beat" />
+
       {mix.recommendations.length ? (
         <GlassCard>
           <SectionHeading

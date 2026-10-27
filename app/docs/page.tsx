@@ -32,6 +32,34 @@ const ENV_VARS = [
     detail:
       "Reserved for a licensed voice-conversion adapter. When unset, voice transformation stays disabled.",
   },
+  {
+    key: "GOOGLE_API_KEY / GOOGLE_VERTEX_ACCESS_TOKEN + GOOGLE_VERTEX_PROJECT",
+    detail:
+      "Optional. Enables Google Lyria 2 beats and instrumentals (up to 30 s) through Vertex AI.",
+  },
+  {
+    key: "STABILITY_API_KEY",
+    detail: "Optional. Enables Stability Stable Audio 2 beats and instrumentals (up to 190 s, WAV).",
+  },
+  {
+    key: "ELEVENLABS_API_KEY",
+    detail: "Optional. Enables ElevenLabs Music songs and vocal hooks (up to 300 s, MP3).",
+  },
+  {
+    key: "REPLICATE_API_TOKEN",
+    detail:
+      "Optional. Enables MusicGen on Replicate — asynchronous, polled by the studio (up to 120 s).",
+  },
+  {
+    key: "SPEND_CAP_USD",
+    detail:
+      "Optional, default 5. Hard ceiling on tracked generation spend. Requests that would exceed it are refused with 402.",
+  },
+  {
+    key: "LYRIA_ / STABLE_AUDIO_ / ELEVENLABS_ / REPLICATE_MUSICGEN_ USD_PER_SEC",
+    detail:
+      "Optional cost overrides in USD per second of generated audio. Used only for the studio's own estimate; the provider invoice is authoritative.",
+  },
 ];
 
 export default function DocsPage() {
@@ -140,6 +168,16 @@ export default function DocsPage() {
               </span>
             </li>
             <li className="flex gap-2">
+              <Icon name="lock" size={12} className="mt-0.5 shrink-0 text-amber-300" />
+              <span>
+                <span className="text-softwhite">AI beat, song and vocal generation</span> is
+                implemented against four hosted providers, but each needs its own key. With no key the
+                Generate panel shows setup instructions and no button — and even with a key,{" "}
+                <span className="mono">allowPaidGeneration</span> is off until you enable it in
+                Settings.
+              </span>
+            </li>
+            <li className="flex gap-2">
               <Icon name="info" size={12} className="mt-0.5 shrink-0 text-cyan-300" />
               <span>
                 <span className="text-softwhite">Native .flp / .cpr projects</span> are not
@@ -157,6 +195,69 @@ export default function DocsPage() {
           </ul>
         </GlassCard>
       </div>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-base font-semibold text-softwhite">
+            AI music generation — what it does and costs
+          </h2>
+          <StatusPill tone="warning" icon="lock">
+            Off until you connect a provider
+          </StatusPill>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          Sam Mix and Sam Vocal contain a Generate panel that can create a new beat, instrumental, song
+          or vocal hook. Nothing is bundled: every result comes from a hosted model on your own account.
+        </p>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full min-w-[560px] border-collapse text-left text-[10px]">
+            <thead>
+              <tr className="border-b border-white/10 text-muted">
+                <th className="py-1.5 pr-2 font-medium">Provider</th>
+                <th className="py-1.5 pr-2 font-medium">Makes</th>
+                <th className="py-1.5 pr-2 font-medium">Max</th>
+                <th className="py-1.5 font-medium">Key</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted">
+              {[
+                ["Google Lyria 2", "beat, instrumental", "30 s", "GOOGLE_API_KEY + GOOGLE_VERTEX_PROJECT"],
+                ["Stability Stable Audio 2", "beat, instrumental", "190 s", "STABILITY_API_KEY"],
+                ["ElevenLabs Music", "song, vocals", "300 s", "ELEVENLABS_API_KEY"],
+                ["MusicGen (Replicate)", "beat, instrumental", "120 s", "REPLICATE_API_TOKEN"],
+              ].map(([provider, kinds, max, key]) => (
+                <tr key={provider} className="border-b border-white/5">
+                  <td className="py-1.5 pr-2 text-softwhite">{provider}</td>
+                  <td className="py-1.5 pr-2">{kinds}</td>
+                  <td className="py-1.5 pr-2">{max}</td>
+                  <td className="mono py-1.5 text-cyan-200">{key}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-muted">
+          <li>
+            <span className="text-softwhite">Three gates before money is spent:</span> the provider must
+            have a key (otherwise 400), paid generation must be switched on in Settings (otherwise 403),
+            and the estimate must fit inside the spend cap (otherwise 402).
+          </li>
+          <li>
+            <span className="text-softwhite">Provenance:</span> each generated asset stores provider,
+            model, prompt, licence, estimated cost and job id — visible on the asset and in the job
+            list.
+          </li>
+          <li>
+            <span className="text-softwhite">Cost display:</span> figures are estimates from
+            configurable per-second prices. Your provider invoice is authoritative; the studio does not
+            reconcile it.
+          </li>
+          <li>
+            <span className="text-softwhite">Licensing:</span> each provider&apos;s terms govern
+            commercial use. MusicGen weights are CC-BY-NC 4.0 unless you use a licensed variant.
+          </li>
+        </ul>
+      </GlassCard>
 
       <GlassCard>
         <h2 className="text-base font-semibold text-softwhite">Workspace reference</h2>
@@ -279,15 +380,21 @@ WAV / MP3 encoding                             PATCH /api/projects/:id (state)
 Canvas waveforms                               GET  /api/assets/:id/audio (Range)
 Prompt + recommendations  ──────────────────▶ POST /api/prompt/improve
                                                POST /api/mix/recommendations
+Generate panel  ──────────────────────────▶ GET  /api/providers
+ (poll every 4 s)                              POST /api/generate
+                                               GET|DELETE /api/generate/:id
                                                         │
                                                         ▼
                                               .data/db.json (atomic writes)
                                               .data/audio/*  .data/exports/*
-                                              optional GEMINI_API_KEY (server only)`}
+                                              optional GEMINI_API_KEY (server only)
+                                              optional generation keys (server only)`}
         </pre>
         <p className="mt-2 text-[10px] leading-relaxed text-muted">
-          Jobs are rendered on the client (so no audio leaves the server) and their real lifecycle is
-          recorded with the project. Swap <span className="mono">lib/server/db.ts</span> for Postgres or
+          Jobs are rendered on the client (so no audio leaves the server for processing) and their real
+          lifecycle is recorded with the project. The single outbound audio path is generation: your
+          text brief goes to the provider you choose, and the rendered file is copied back into private
+          storage with its prompt and licence recorded. Swap <span className="mono">lib/server/db.ts</span> for Postgres or
           Supabase to move to a queue-backed multi-user deployment.
         </p>
       </GlassCard>
