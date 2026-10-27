@@ -33,6 +33,30 @@ const ENV_VARS = [
       "Optional, default true. Set to false to close new accounts on an exposed studio. The first account can still be created, and existing accounts keep working.",
   },
   {
+    key: "ADMIN_EMAIL",
+    detail:
+      "The one address with admin rights. Rights are derived from it on every request, never stored, so it cannot be granted to another account. Empty means nobody can open /admin.",
+  },
+  {
+    key: "ADMIN_BOOTSTRAP_CODE",
+    detail:
+      "Optional. A fixed one-time code for /admin-bootstrap while Google is unconfigured (single use, 24 h). If unset, a random code is printed in the server log at start-up.",
+  },
+  {
+    key: "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET",
+    detail:
+      "Optional. Enables Continue with Google. Register /api/auth/google/callback as an authorised redirect URI. Without them the button reads awaiting configuration.",
+  },
+  {
+    key: "GOOGLE_REDIRECT_URI",
+    detail: "Optional. Pins the OAuth redirect URI when it differs from NEXT_PUBLIC_SITE_URL.",
+  },
+  {
+    key: "RESEND_API_KEY / EMAIL_FROM",
+    detail:
+      "Optional. The only path that actually sends verification mail. With no key nothing is sent, the API says so, and the admin verifies accounts by hand.",
+  },
+  {
     key: "VOICE_CONVERSION_API_URL",
     detail:
       "Reserved for a licensed voice-conversion adapter. When unset, voice transformation stays disabled.",
@@ -239,11 +263,92 @@ export default function DocsPage() {
             account cannot delete itself — that would orphan everyone else.
           </li>
           <li>
-            <span className="text-softwhite">No email is sent.</span> There is no verification or reset
-            mail in this build, so none is promised; a forgotten password is reset by whoever runs the
-            server.
+            <span className="text-softwhite">Verification exists, sending does not.</span> Links are
+            issued, hashed and expire after 24 hours, but posting them needs RESEND_API_KEY and
+            EMAIL_FROM. Until then the account page reports that no email was sent and the admin can
+            verify the account from /admin.
+          </li>
+          <li>
+            <span className="text-softwhite">No password-reset mail</span> is sent even with a provider
+            configured; a forgotten password is reset by whoever runs the server.
           </li>
         </ul>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-base font-semibold text-softwhite">Roles, dashboards and the admin console</h2>
+          <StatusPill tone="success" icon="user">
+            Implemented
+          </StatusPill>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          At sign-up (or at <span className="mono">/welcome</span> after a Google sign-in) an account
+          says what it does. One account can hold several roles, and the answer decides the dashboard.
+        </p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5">
+            <div className="text-[10px] font-semibold text-softwhite">Artist</div>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+              Sam Vocal Studio plus publishing and promotion tools. No mixer or mastering chain.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5">
+            <div className="text-[10px] font-semibold text-softwhite">Producer / beat maker</div>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+              The whole studio: vocal, mix, mastering, beats for sampling, and shares.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5">
+            <div className="text-[10px] font-semibold text-softwhite">Engineer</div>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+              Mixing and mastering for other people&apos;s sessions, plus vocal cleanup — all three
+              studios.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5">
+            <div className="text-[10px] font-semibold text-softwhite">Promoter</div>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+              Publishing and promotion surfaces, profile links, and shares. No processing tools.
+            </p>
+          </div>
+        </div>
+        <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-muted">
+          <li>
+            <span className="text-softwhite">Hidden means refused.</span> The server checks the same role
+            map as the navigation (<span className="mono">lib/roles.ts</span>), so a hidden screen is also
+            a 403.
+          </li>
+          <li>
+            <span className="text-softwhite">The admin</span> is always the address in{" "}
+            <span className="mono">ADMIN_EMAIL</span> and can open every screen. <span className="mono">/admin</span>{" "}
+            lists all accounts with their projects, files, storage and share links, and can set roles,
+            verify, suspend (which ends that account&apos;s sessions at once) or delete an account.
+          </li>
+          <li>
+            <span className="text-softwhite">Getting in as admin:</span> Google sign-in with that address,
+            or — while Google is unconfigured — the one-time code printed in the server log, entered at{" "}
+            <span className="mono">/admin-bootstrap</span>. No admin password lives in the repository.
+          </li>
+        </ul>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-base font-semibold text-softwhite">Public creator pages</h2>
+          <StatusPill tone="warning" icon="eye">
+            Partially implemented
+          </StatusPill>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          <span className="mono">/u/&lt;handle&gt;</span> shows a creator&apos;s name, roles, bio and
+          AudioMack / Instagram / Facebook links without signing in, and never reveals an email address.
+        </p>
+        <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
+          <span className="text-softwhite">Not built yet:</span> published songs on that page, follows,
+          likes and download counters. Those are labelled planned in the app rather than displayed empty;
+          finished songs travel as revocable share links today.
+        </p>
       </GlassCard>
 
       <GlassCard>

@@ -1,17 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { GradientText, StatusPill, Toasts, cn, Modal, ProgressBar } from "@/components/ui/primitives";
+import { GlassCard, GradientText, StatusPill, Toasts, cn, Modal, ProgressBar } from "@/components/ui/primitives";
 import { GlobalPlayer } from "@/components/audio/GlobalPlayer";
 import { useStudio } from "@/lib/client/studio";
+import { canAdminister, canOpenRoute, canUseStudio, describeRoles } from "@/lib/roles";
+import type { AccountRole } from "@/lib/types";
 import { isPublicPath } from "@/lib/routes";
 import { formatBytes, relativeTime } from "@/lib/format";
 import { NewProjectButton } from "@/components/shell/NewProjectDialog";
 
-const NAV: { href: string; label: string; icon: IconName; studio?: "vocal" | "mix" | "master" }[] = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: IconName;
+  /** Studio key; hidden when the signed-in account's roles exclude it. */
+  studio?: "vocal" | "mix" | "master";
+  /** Shown only to the studio admin. */
+  admin?: boolean;
+}
+
+/**
+ * Navigation, filtered per account role.
+ *
+ * Producers and engineers see all three studios; artists see Sam Vocal Studio
+ * (writing and vocals); promoters see no studio at all — their dashboard is
+ * about getting finished songs out. Admins bypass the filter entirely, so the
+ * owner can always inspect every screen. Screens a role cannot use are hidden
+ * rather than shown-and-blocked, and the API enforces the same rule server-side.
+ */
+const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/vocal", label: "Sam Vocal Studio", icon: "mic", studio: "vocal" },
   { href: "/mix", label: "Sam Mix Studio", icon: "sliders", studio: "mix" },
@@ -21,6 +42,7 @@ const NAV: { href: string; label: string; icon: IconName; studio?: "vocal" | "mi
   { href: "/exports", label: "Export History", icon: "download" },
   { href: "/shares", label: "Share with friends", icon: "link" },
   { href: "/account", label: "My account", icon: "user" },
+  { href: "/admin", label: "Admin console", icon: "lock", admin: true },
   { href: "/settings", label: "Settings", icon: "settings" },
   { href: "/docs", label: "Documentation", icon: "file" },
   { href: "/help", label: "Help & DAW import", icon: "info" },
@@ -57,11 +79,32 @@ function Brand({ compact }: { compact?: boolean }) {
   );
 }
 
+/**
+ * Whether a nav entry is shown for this account.
+ *
+ * Before the account has loaded (`user` undefined) everything is visible, so the
+ * sidebar does not flicker on first paint; the API still refuses anything the
+ * roles do not allow.
+ */
+function visibleFor(
+  item: NavItem,
+  user: { roles?: string[]; isAdmin?: boolean } | null | undefined,
+): boolean {
+  if (!user) return true;
+  if (item.admin) return canAdminister(user.isAdmin);
+  if (!item.studio) return true;
+  // The nav uses "master" as its route key; the role map calls it "mastering".
+  const studio = item.studio === "master" ? "mastering" : item.studio;
+  return canUseStudio(user.roles as never, studio, user.isAdmin === true);
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { user } = useStudio();
+  const items = NAV.filter((item) => visibleFor(item, user as never));
   return (
     <nav className="flex flex-col gap-1" aria-label="Main navigation">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href;
         return (
           <Link
@@ -115,20 +158,82 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/**
+ * Shown instead of a studio whose tools this account's roles do not include.
+ *
+ * The navigation already hides those links; this covers a typed URL or an old
+ * bookmark. The API refuses the same requests, so this is the friendly face of a
+ * 403 rather than the barrier itself.
+ */
+function RoleBlocked({ pathname }: { pathname: string }) {
+  const studio =
+    pathname.startsWith("/mastering")
+      ? "Sam Mastering Studio"
+      : pathname.startsWith("/mix")
+        ? "Sam Mix Studio"
+        : pathname.startsWith("/vocal")
+          ? "Sam Vocal Studio"
+          : "that workspace";
+  return (
+    <div className="mx-auto max-w-xl py-10">
+      <GlassCard>
+        <div className="flex items-start gap-2">
+          <Icon name="lock" size={16} className="mt-0.5 shrink-0 text-amber-300" />
+          <div>
+            <h1 className="text-sm font-semibold text-softwhite">
+              {studio} is not on your dashboard
+            </h1>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">
+              Your roles decide which studios you get: artists work in Sam Vocal Studio, producers and
+              engineers get all three, promoters get publishing tools. Nothing is broken — this screen
+              just is not part of your setup.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <Link href="/" className="btn-ghost text-[11px]">
+                <Icon name="dashboard" size={11} /> Dashboard
+              </Link>
+              <Link href="/account" className="btn-primary text-[11px]">
+                <Icon name="user" size={11} /> Change my roles
+              </Link>
+            </div>
+            <p className="mt-2 text-[9px] leading-relaxed text-muted/60">
+              Only the studio admin can grant a role you cannot set yourself.
+            </p>
+          </div>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
 export function StudioShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { settings, system, notify, user, signOut } = useStudio();
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
+  const roles = (user?.roles ?? []) as AccountRole[];
+
+  // A brand-new account (typically via Google) chooses roles before anything else.
+  const needsOnboarding = Boolean(user) && roles.length === 0 && pathname !== "/welcome";
+  useEffect(() => {
+    if (needsOnboarding) router.replace("/welcome");
+  }, [needsOnboarding, router]);
+
   // Sign-in, sign-up and a friend's shared link are their own screens: no
   // studio navigation, no project switcher, no player chrome.
   if (isPublicPath(pathname)) {
     return <div className="min-h-dvh">{children}</div>;
   }
+
+  const blocked =
+    Boolean(user) &&
+    roles.length > 0 &&
+    !canOpenRoute(pathname ?? "/", roles, user?.isAdmin === true);
 
   const storageUsed = (system?.storage.audioBytes ?? 0) + (system?.storage.exportBytes ?? 0);
   const storageCap = 2 * 1024 * 1024 * 1024;
@@ -162,6 +267,12 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
                 {user?.name ?? "Not signed in"}
               </div>
               <div className="truncate text-[9px] text-muted">{user?.email ?? ""}</div>
+              {user ? (
+                <div className="truncate text-[9px] text-violet-200/70">
+                  {describeRoles(user.roles)}
+                  {user.isAdmin ? " · admin" : ""}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="mt-2 flex gap-1.5">
@@ -217,7 +328,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-[268px]">
         <TopBar onOpenMenu={() => setMobileOpen(true)} />
         <main className="mx-auto w-full max-w-[1400px] px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-8 3xl:max-w-[1680px]">
-          {children}
+          {blocked ? <RoleBlocked pathname={pathname ?? "/"} /> : children}
         </main>
       </div>
 
@@ -228,7 +339,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
 }
 
 function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
-  const { projects, project, saveState, savedAt, selectProject, settings } = useStudio();
+  const { projects, project, saveState, savedAt, selectProject, settings, user } = useStudio();
   const pathname = usePathname();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const jobs = project?.jobs ?? [];
@@ -370,7 +481,9 @@ function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
         </div>
       </div>
       <div className="scroll-x flex items-center gap-1.5 border-t border-white/[0.05] px-3 py-1.5 lg:hidden">
-        {NAV.filter((item) => item.studio || item.href === "/").map((item) => {
+        {NAV.filter(
+          (item) => (item.studio || item.href === "/") && visibleFor(item, user as never),
+        ).map((item) => {
           const active = pathname === item.href;
           return (
             <Link

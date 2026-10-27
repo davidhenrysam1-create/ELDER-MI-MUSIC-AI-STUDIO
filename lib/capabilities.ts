@@ -40,18 +40,53 @@ export const CAPABILITIES: Capability[] = [
       "Read-only `/s/<token>` page exposing only mixer-channel audio, with optional download, expiry and passcode, instant revocation, and hashed tokens (the link is shown once).",
   },
   {
-    name: "Email verification, password-reset mail and email changes",
+    name: "Roles: artist, producer, engineer and promoter dashboards",
     area: "Platform",
-    status: "planned",
+    status: "ready",
     detail:
-      "No mail service is configured, so none of these are offered rather than faked. Recovery is done by the person running the server.",
+      "One account can hold several roles. Roles decide which of the three studios and which dashboard sections appear, are enforced again by the API, and can be changed by the account holder or by the admin.",
   },
   {
-    name: "Public artist pages, follows and a social feed",
+    name: "Admin console for every account",
+    area: "Platform",
+    status: "ready",
+    detail:
+      "The account named by ADMIN_EMAIL can list all accounts with their projects, files, storage and live share links, then set roles, mark an address verified, suspend (which ends that session immediately) or delete an account and its work.",
+  },
+  {
+    name: "Continue with Google",
+    area: "Platform",
+    status: "needs",
+    detail:
+      "Code-complete OAuth 2.0 flow (state cookie, code exchange, verified email). It stays visibly off until GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set, and the sign-in screen says so instead of showing a button that cannot finish.",
+  },
+  {
+    name: "Email verification links",
+    area: "Platform",
+    status: "needs",
+    detail:
+      "Tokens are issued, hashed and expire after 24 hours, and the admin can verify an address by hand. Sending needs RESEND_API_KEY and EMAIL_FROM; without them the app reports that nothing was sent.",
+  },
+  {
+    name: "Public creator pages with social links",
+    area: "Platform",
+    status: "ready",
+    detail:
+      "`/u/<handle>` shows a creator's name, roles, bio and AudioMack / Instagram / Facebook links without revealing an email address. Whether a page exists at all is the creator's choice.",
+  },
+  {
+    name: "Published songs, follows, likes and downloads",
     area: "Platform",
     status: "planned",
     detail:
-      "Sharing is per-project, per-link and revocable. There is no public discovery, no follower graph and no comment system.",
+      "Not built yet. Today a finished song travels as a revocable share link. Publishing, a follower graph, likes and download counters are labelled planned wherever they are mentioned.",
+  },
+  {
+    name: "Password reset by email",
+    area: "Platform",
+    status: "planned",
+    detail:
+      "No reset mail is sent, even when an email provider is configured. A forgotten password is reset by whoever runs the server, and the account page says exactly that.",
   },
   {
     name: "Generation billing guards (paid off by default, hard spend cap)",

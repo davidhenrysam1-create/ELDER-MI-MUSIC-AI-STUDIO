@@ -7,7 +7,7 @@
  * Polling is explicit rather than server-push so the studio works on a plain
  * Node server with no queue infrastructure.
  */
-import { guard } from "@/lib/server/auth";
+import { guardAnyStudio } from "@/lib/server/auth";
 import { advanceGeneration, cancelGeneration } from "@/lib/server/generation";
 import { ProviderError } from "@/lib/server/providers/types";
 import { jsonError } from "@/lib/server/validation";
@@ -18,7 +18,7 @@ export const maxDuration = 120;
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
-  const auth = await guard();
+  const auth = await guardAnyStudio();
   if (auth.response) return auth.response;
   const { id } = await params;
   try {
@@ -32,7 +32,7 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const auth = await guard();
+  const auth = await guardAnyStudio();
   if (auth.response) return auth.response;
   const { id } = await params;
   try {

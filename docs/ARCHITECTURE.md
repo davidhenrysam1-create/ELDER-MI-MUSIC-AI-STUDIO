@@ -206,10 +206,69 @@ passcode hash, expiry, revoke timestamp, counters). `Project`, `ExportRecord` an
 - Counters (`opens`, `downloads`, `lastOpenedAt`) are incremented on stream start and on successful
   download only. Nothing else about the visitor is stored.
 
+## 5d. Roles, admin and Google sign-in (`lib/roles.ts`, `lib/server/auth.ts`, `lib/server/google.ts`, `lib/server/email.ts`)
+
+**Roles** live on the account (`AccountRole[]`, one or more of `artist | producer | engineer | promoter`)
+and are normalised through `cleanRoles()`, so an unknown string from a client is dropped rather than
+stored. `lib/roles.ts` is the single mapping used by both the shell and the pages:
+
+- `STUDIO_ROLES` — `vocal: [artist, producer, engineer]`, `mix`/`mastering`: `[producer, engineer]`.
+- `canUseStudio()`, `studiosForRoles()`, `canPublish()`, `canOpenRoute()`, `homeForRoles()`.
+- `canAdminister()` — true only when `isAdmin`, and `isAdmin` is derived from `ADMIN_EMAIL` on every read
+  (`isAdminEmail()`), never trusted from the stored document.
+
+The navigation filters items with the same helpers (`studio` keys in `StudioShell`), and every tool route
+still calls a guard server-side, so hiding a link is convenience and not the boundary:
+
+- `guardStudio(studio)` — 403 `role_required` unless the account's roles include that studio
+  (`/api/mix/recommendations` uses `mix`).
+- `guardAnyStudio()` — 403 for an account with no studio roles at all, used by `/api/prompt/improve`
+  and `/api/generate*` (a promoter dashboard has no processing tools).
+- `adminGuard()` — 403 unless the address is `ADMIN_EMAIL`.
+
+`StudioShell` also renders a "not on your dashboard" card instead of the page when a typed URL is
+outside the account's roles, and sends an account with no roles to `/welcome`.
+
+**Admin actions** (`/api/admin/users*`, guarded by `adminGuard()`):
+
+- `adminUpdateUser()` sets roles, name, `emailVerified`, and suspension. Suspending sets `suspendedAt`,
+  and immediately deletes every session for that user — an open tab stops working on its next request
+  (`assertActive()` runs inside `currentUser()`).
+- It refuses to suspend the admin address or the caller, and DELETE refuses the admin account, so the
+  console cannot lock the studio out.
+- Deleting an account calls `deleteAccountData()` (removes its files) and then `deleteUser()`.
+
+**Google sign-in** is a standard authorisation-code flow in `lib/server/google.ts`: a random `state` in an
+HttpOnly cookie, a code exchange at Google's token endpoint, then the profile from `userinfo`. Only a
+Google-verified address is accepted. `signInWithGoogle()` links by `googleSub` first, then by email,
+creates the account if neither exists (provider `google`, `emailVerified: true`) and refuses suspended
+accounts. Reckless auto-linking is avoided because Google has already proven the address.
+
+**Bootstrap code** exists only so the owner can reach `/admin` before Google is configured: a random code
+(or `ADMIN_BOOTSTRAP_CODE`), hashed with SHA-256, single use, 24-hour expiry, printed to the server log and
+never emailed. It is refused outright once Google is configured. No admin password is stored anywhere.
+
+**Email** (`lib/server/email.ts`) is a single Resend HTTPS POST behind `emailConfigured()`. With no key or
+no `EMAIL_FROM` it returns `{ sent: false, reason }`; `/api/auth/verify/send` forwards that reason to the
+browser and suggests admin verification. Verification tokens are random 192-bit values stored as SHA-256
+with a 24-hour expiry (`issueVerificationToken()`, `confirmEmail()`).
+
+**Public profiles** (`GET /api/profile/<handle>` → `/u/<handle>`) expose only name, handle, roles, bio,
+the three social links and the join date. `getPublicProfile()` returns `null` for suspended accounts and
+the response explicitly reports `published: []` / `publishingAvailable: false` — nothing is invented.
+
 ## 6. API surface
 
 | Route | Methods | Notes |
 | --- | --- | --- |
+| `/api/auth/me` | GET, PATCH | session view; PATCH name/handle/bio/links/roles |
+| `/api/auth/google/start`, `/api/auth/google/callback` | GET | Google OAuth; `start` redirects with an honest error when unconfigured |
+| `/api/auth/bootstrap` | POST | one-time admin code |
+| `/api/auth/onboarding` | POST | save roles (and handle) from `/welcome` |
+| `/api/auth/verify/send`, `/api/auth/verify/confirm` | POST, GET | issue a token / confirm the link |
+| `/api/admin/users` | GET | admin: all accounts plus per-account stats |
+| `/api/admin/users/:id` | PATCH, DELETE | admin: roles, verify, suspend, delete |
+| `/api/profile/:handle` | GET | public profile; no email, no moderation fields |
 | `/api/projects` | GET, POST | list / create |
 | `/api/projects/:id` | GET, PATCH, DELETE | patch ignores `id`/`createdAt`; DELETE removes files |
 | `/api/projects/:id/assets` | POST | multipart; extension, size, duration validation; optional channel creation |

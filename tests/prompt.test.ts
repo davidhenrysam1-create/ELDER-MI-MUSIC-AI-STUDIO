@@ -10,11 +10,15 @@ const ctx = { genre: "Afrobeats", bpm: 104, key: "F# minor" };
  */
 beforeAll(async () => {
   const auth = await import("@/lib/server/auth");
+  // Prompt help serves all three studios, so this account holds a studio role
+  // (a promoter-only account is refused, which is covered in tests/identity).
   auth.__setSessionOverrideForTests(async () => ({
     id: "usr_prompt_test",
     email: "prompt@studio.test",
     name: "Prompt Tester",
     role: "owner",
+    roles: ["producer"],
+    isAdmin: false,
     createdAt: new Date().toISOString(),
     lastLoginAt: null,
   }));

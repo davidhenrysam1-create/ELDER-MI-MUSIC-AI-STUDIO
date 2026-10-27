@@ -131,7 +131,23 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "I forgot my password — can you email me a reset link?",
-    a: "No, and the studio does not pretend otherwise: this build has no mail service. While signed in you can change the password in My account (which signs every device out). If you are locked out, the person running the studio server can reset it from the machine that stores .data/db.json.",
+    a: "No reset mail is sent, even when an email provider is configured; the studio does not pretend otherwise. While signed in you can change the password in My account (which signs every device out). If you are locked out, the person running the studio server can reset it on the machine that stores .data/db.json.",
+  },
+  {
+    q: "Why can I not see the mixer or mastering studios?",
+    a: "Your account is set to Artist or Promoter. Roles decide the dashboard: artists get Sam Vocal Studio plus publishing tools, promoters get publishing and promotion only, producers and engineers get all three studios. Change it in My account → What you do here, or ask the admin — the change applies on your next page load. The server enforces the same rules, so a hidden screen is also refused, never silently empty.",
+  },
+  {
+    q: "How do I sign in as the studio admin?",
+    a: "Use Continue with Google with the address in ADMIN_EMAIL. Until GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set, the studio prints a one-time bootstrap code in the terminal at start-up: open /admin-bootstrap and enter it (single use, 24 hours; ADMIN_BOOTSTRAP_CODE chooses your own). No admin password is stored in the repository, and the admin can never be suspended or deleted from the console.",
+  },
+  {
+    q: "Another account joined — what can the admin do about it?",
+    a: "Open /admin (only the admin sees the link). It lists every account with its roles, sign-in method, verification, project count, files, storage and live share links. From there the admin can change roles, mark an address verified by hand, suspend an account (which blocks sign-in and ends its sessions immediately, without deleting its work) or delete it along with its projects, audio, exports and share links.",
+  },
+  {
+    q: "I clicked Continue with Google and nothing happened.",
+    a: "The button only appears as a working link when Google is configured; otherwise it reads awaiting configuration and explains the two variables it needs. To enable it, create an OAuth client in Google Cloud Console, add <your address>/api/auth/google/callback as an authorised redirect URI, put the client id and secret in .env.local and restart. Nothing is faked while it is off.",
   },
   {
     q: "How do I add a bandmate or a friend as a user?",

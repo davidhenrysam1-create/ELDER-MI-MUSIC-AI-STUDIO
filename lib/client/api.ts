@@ -1,9 +1,11 @@
 import type {
+  AccountRole,
   AssetMeta,
   ExportRecord,
   GenerationJob,
   GenerationKind,
   MusicProviderId,
+  ProfileLinks,
   Project,
   ProjectVersion,
   StudioId,
@@ -77,6 +79,17 @@ export interface AccountUser {
   email: string;
   name: string;
   role: "owner" | "member";
+  /** Artist / producer / engineer / promoter; empty until chosen on /welcome. */
+  roles?: AccountRole[];
+  handle?: string | null;
+  bio?: string;
+  links?: ProfileLinks;
+  /** True only for the address in ADMIN_EMAIL. */
+  isAdmin?: boolean;
+  emailVerified?: boolean;
+  provider?: "password" | "google" | "bootstrap";
+  suspendedAt?: string | null;
+  suspendedReason?: string | null;
   createdAt: string;
   lastLoginAt: string | null;
 }
@@ -93,6 +106,35 @@ export interface MeResponse {
   sessions: SessionSummary[];
   signupOpen: boolean;
   allowSignupEnv: boolean;
+  /** Whether Google OAuth has credentials, with the reason when it does not. */
+  google?: { configured: boolean; reason: string };
+  adminSignIn?: {
+    /** Masked, e.g. `d****@gmail.com` — the raw address is never published. */
+    adminEmailMasked: string | null;
+    adminExists: boolean;
+    googleConfigured: boolean;
+    bootstrapAvailable: boolean;
+  };
+  email?: { configured: boolean; from: string | null; reason: string };
+}
+
+/** One row of the admin console. */
+export interface AdminUserRow {
+  user: AccountUser;
+  stats: { userId: string; projects: number; assets: number; bytes: number; shares: number };
+}
+
+export interface AdminOverview {
+  users: AccountUser[];
+  stats: { userId: string; projects: number; assets: number; bytes: number; shares: number }[];
+  totals: {
+    users: number;
+    admins: number;
+    suspended: number;
+    verified: number;
+    projects: number;
+    storage: { audioBytes: number; exportBytes: number };
+  };
 }
 
 /** Owner-facing view of a share link (no token, no passcode). */
@@ -128,7 +170,47 @@ export const api = {
       body: JSON.stringify(body),
     }),
   logout: () => jsonFetch<{ ok: true }>("/api/auth/logout", { method: "POST" }),
-  updateMe: (body: { name: string }) =>
+  /** Google sign-in needs a full navigation, so this is a URL, not a fetch. */
+  googleSignInUrl: "/api/auth/google/start",
+  bootstrap: (code: string) =>
+    jsonFetch<{ user: AccountUser }>("/api/auth/bootstrap", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+  onboarding: (body: { roles: AccountRole[]; handle?: string }) =>
+    jsonFetch<{ user: AccountUser }>("/api/auth/onboarding", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  sendVerification: () =>
+    jsonFetch<{ sent: boolean; reason?: string; hint?: string; expiresAt?: string }>(
+      "/api/auth/verify/send",
+      { method: "POST" },
+    ),
+  adminOverview: () => jsonFetch<AdminOverview>("/api/admin/users"),
+  adminUpdateUser: (
+    id: string,
+    patch: {
+      roles?: AccountRole[];
+      suspended?: boolean;
+      suspendedReason?: string;
+      emailVerified?: boolean;
+      name?: string;
+    },
+  ) =>
+    jsonFetch<{ user: AccountUser }>(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  adminDeleteUser: (id: string) =>
+    jsonFetch<{ ok: true }>(`/api/admin/users/${id}`, { method: "DELETE" }),
+  updateMe: (body: {
+    name?: string;
+    handle?: string | null;
+    bio?: string;
+    links?: Partial<ProfileLinks>;
+    roles?: AccountRole[];
+  }) =>
     jsonFetch<{ user: AccountUser }>("/api/auth/me", {
       method: "PATCH",
       body: JSON.stringify(body),

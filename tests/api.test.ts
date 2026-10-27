@@ -48,6 +48,9 @@ const TEST_USER = {
   email: "tester@studio.test",
   name: "API Tester",
   role: "owner" as const,
+  // The studio endpoints are role-gated, so this test account holds every role.
+  roles: ["artist", "producer", "engineer", "promoter"] as ("artist" | "producer" | "engineer" | "promoter")[],
+  isAdmin: false,
   createdAt: new Date().toISOString(),
   lastLoginAt: new Date().toISOString(),
 };
