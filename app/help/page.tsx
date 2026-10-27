@@ -151,7 +151,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "I forgot my password — can you email me a reset link?",
-    a: "No reset mail is sent, even when an email provider is configured; the studio does not pretend otherwise. While signed in you can change the password in My account (which signs every device out). If you are locked out, the person running the studio server can reset it on the machine that stores .data/db.json.",
+    a: "That is built: open Forgot password on the sign-in screen, enter your address, and the studio emails a one-use link that expires in an hour. Opening it lets you choose a new password, and every device is signed out. Two honest caveats. The link can only be sent when the server has RESEND_API_KEY and EMAIL_FROM; without them the screen says No email was sent and tells you to ask whoever runs the studio. And the form never reveals whether an address has an account — it answers the same way either way. While signed in you can also change the password in My account.",
   },
   {
     q: "Why can I not see the mixer or mastering studios?",

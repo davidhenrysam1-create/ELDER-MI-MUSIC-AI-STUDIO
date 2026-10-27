@@ -30,12 +30,22 @@ import { NextResponse, type NextRequest } from "next/server";
  *  - a friend's shared link (`/s/`) and a creator's public page (`/u/`);
  *  - the PWA fallback.
  */
-const PUBLIC_PREFIXES = ["/login", "/signup", "/admin-bootstrap", "/s/", "/u/", "/offline"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/signup",
+  // Password recovery happens *before* anyone can sign in.
+  "/forgot",
+  "/reset",
+  "/admin-bootstrap",
+  "/s/",
+  "/u/",
+  "/offline",
+];
 /**
  * Screens that only exist in accounts mode. In open mode they have nothing to
  * do, so they forward to the dashboard instead of showing a login form.
  */
-const SIGN_IN_PATHS = ["/login", "/signup", "/admin-bootstrap", "/welcome"];
+const SIGN_IN_PATHS = ["/login", "/signup", "/admin-bootstrap", "/welcome", "/forgot", "/reset"];
 const PUBLIC_FILES = [
   "/manifest.webmanifest",
   "/sw.js",

@@ -277,6 +277,13 @@ silent sign-in loop, not an error. `SameSite=None` is paired with `middleware.ts
 refuses state-changing requests whose `Origin` host does not match the served host. Clearing a cookie
 repeats the same attributes (an expired value, not a bare delete), otherwise the browser keeps the old one.
 
+**Password reset** (`/api/auth/password/forgot`, `/api/auth/password/reset`, pages `/forgot` and
+`/reset`): a 24-byte random token hashed with SHA-256 in `resetTokenHash`, valid for `RESET_MINUTES`
+(60), single use, replaced on every request. The forgot endpoint answers identically for unknown,
+suspended and Google-only addresses so it cannot enumerate accounts, and it never mints a token when no
+mail provider exists — it returns the provider's own reason instead. A successful reset stores a fresh
+scrypt hash, clears `passwordSeeded`, burns the token and deletes every session for that account.
+
 **Bootstrap code** exists only so the owner can reach `/admin` before Google is configured: a random code
 (or `ADMIN_BOOTSTRAP_CODE`), hashed with SHA-256, single use, 24-hour expiry, printed to the server log and
 never emailed. It is refused outright once Google is configured. No admin password is stored anywhere.

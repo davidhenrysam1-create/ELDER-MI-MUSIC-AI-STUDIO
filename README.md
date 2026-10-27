@@ -229,6 +229,7 @@ exports, voice profiles and share links.
 | `/signup` | Name, email, password (8+ chars) **and your roles** — artist, producer, engineer (beat maker), promoter, or several at once. The **first** account becomes the studio owner and adopts anything saved before accounts existed, so upgrading loses nothing. |
 | `/login` | Email + password, with "show password" and a return path (`?next=`). **Continue with Google** is always a real button: one-tap sign-in once the Google client exists, and until then it opens a set-up panel (see *Turning on Google sign-in* below). |
 | `/welcome` | The role picker, for accounts that arrive without roles (Google sign-in cannot ask). |
+| `/forgot` | Ask for a password-reset link: a one-use token (SHA-256 stored, 1 hour) mailed through Resend, then `/reset` sets the new password and ends every session. Answers the same way for an unknown address, so it cannot be used to discover accounts. Only exists in accounts mode — open studio forwards it to `/`. |
 | `/account` | Change display name, roles, public handle, bio and AudioMack / Instagram / Facebook links; change password (signs every device out); see active sessions; verification status; close the account. |
 | `/u/<handle>` | Your **public page**: name, roles, bio and social links — never your email. No sign-in needed to view it. |
 | `/admin` | The admin console (see below). Appears in the navigation only for the admin account. |
@@ -285,8 +286,9 @@ replayed as a login. Sessions last 30 days and are listed by device type — no 
 
 Honest gaps, stated in the UI too:
 
-- **No password-reset email** is sent, even with an email provider configured. A forgotten password is
-  reset by the person running the server.
+- **Password reset by email** is built (`/forgot` → emailed link → `/reset`), but it can only *send*
+  once `RESEND_API_KEY` + `EMAIL_FROM` exist. Without them the screen says **no email was sent** and the
+  password is reset by whoever runs the server.
 - **Email verification links** are issued and expire after 24 hours, but posting them needs
   `RESEND_API_KEY` + `EMAIL_FROM`. Until then the account page says *"no email was sent"* and the admin
   verifies accounts by hand.
@@ -382,6 +384,24 @@ Copy `.env.example` to `.env.local`:
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Turns on **Continue with Google**. Add `/api/auth/google/callback` as an authorised redirect URI (see below). |
 | `GOOGLE_REDIRECT_URI` | Optional. Pins the redirect URI when it differs from `NEXT_PUBLIC_SITE_URL`. |
 
+#### Turning on reset + verification emails (about two minutes, once)
+
+1. Create a free account at [resend.com](https://resend.com) → **API Keys → Create** → copy the key
+   (`re_…`).
+2. **Domains → Add domain** and follow the DNS records it gives you (this is what lets mail come from
+   your own address). For a first test you can skip this and use Resend's `onboarding@resend.dev`,
+   which only delivers to the address that owns the Resend account.
+3. In `.env.local`:
+
+   ```bash
+   RESEND_API_KEY=re_your_key
+   EMAIL_FROM="Elder Mi Music <no-reply@your-domain.com>"
+   ```
+
+4. Restart. `/forgot` now mails a one-use link (valid 1 hour), and *Verify my email* in **My account**
+   mails its 24-hour link. With either variable missing, both screens keep saying **no email was sent**
+   rather than pretending.
+
 #### Turning on Google sign-in (about two minutes, once)
 
 1. Open [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) and
@@ -399,7 +419,7 @@ Copy `.env.example` to `.env.local`:
 
 If the address ever changes (a new preview URL, a real domain), add the new redirect URI as well —
 Google allows several. Until credentials exist nothing is faked: no request leaves the server.
-| `RESEND_API_KEY`, `EMAIL_FROM` | Optional. The only way verification emails are actually sent. Without them nothing is mailed and the UI says so. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | Optional. The only way verification and password-reset emails are actually sent. Without them nothing is mailed and the UI says so. |
 | `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close public sign-up. |
 | `MAX_UPLOAD_MB`, `MAX_DURATION_SEC` | Default upload limits; editable in Settings. |
 | `VOICE_CONVERSION_API_URL` | Reserved for a licensed voice-conversion adapter. |

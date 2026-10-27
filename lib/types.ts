@@ -496,6 +496,12 @@ export interface User {
   /** SHA-256 of the current verification link token, and its expiry. */
   verifyTokenHash?: string | null;
   verifyExpiresAt?: string | null;
+  /**
+   * SHA-256 of the current password-reset token, and its expiry. Single use:
+   * both fields are cleared the moment a new password is stored.
+   */
+  resetTokenHash?: string | null;
+  resetExpiresAt?: string | null;
   provider?: AuthProvider;
   /** Google's stable subject id, when the account is linked to Google. */
   googleSub?: string | null;

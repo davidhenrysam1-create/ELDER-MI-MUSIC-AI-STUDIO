@@ -187,9 +187,17 @@ function LoginForm() {
           </div>
 
           <div>
-            <label className="label mb-1 block" htmlFor="password">
-              Password
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="label block" htmlFor="password">
+                Password
+              </label>
+              <Link
+                href="/forgot"
+                className="text-[10px] font-semibold text-violet-200 underline decoration-violet/30 underline-offset-2 hover:text-white"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <input
                 id="password"
@@ -268,10 +276,9 @@ function LoginForm() {
         </div>
 
         <p className="mt-2 text-center text-[9px] leading-relaxed text-muted/60">
-          No password reset email is sent:{" "}
           {config?.email?.configured
-            ? "email is configured, but reset links are not implemented yet."
-            : "this build has no mail provider. A forgotten password is reset by whoever runs the server."}
+            ? "Forgotten passwords are reset by email: a one-use link that expires in an hour."
+            : "No mail provider is configured, so reset links cannot be emailed. A forgotten password is reset by whoever runs the server."}
         </p>
       </GlassCard>
     </div>

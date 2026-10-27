@@ -40,6 +40,13 @@ export const CAPABILITIES: Capability[] = [
       "Scrypt password hashing, HttpOnly session cookies (the database stores only a hash), 30-day expiry, password change that revokes other sessions, and ownership checks on every project, asset, export and profile.",
   },
   {
+    name: "Password reset by email",
+    area: "Platform",
+    status: "needs",
+    detail:
+      "`/forgot` mints a one-use token (SHA-256 stored, 1 hour), emails a link through Resend, `/reset` sets the new password and ends every session. Awaiting configuration: without RESEND_API_KEY and EMAIL_FROM the screen says plainly that no email was sent.",
+  },
+  {
     name: "Share a project with friends by private link",
     area: "Platform",
     status: "ready",
