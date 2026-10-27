@@ -47,6 +47,11 @@ const scrypt = promisify(scryptCb) as (
  */
 let sessionOverride: (() => Promise<PublicUser | null>) | null = null;
 
+/** Test seam: forget the in-memory bootstrap code so a test can start clean. */
+export function __resetBootstrapForTests(): void {
+  bootstrapRecord = null;
+}
+
 /** Set (or clear) the signed-in account used by tests. */
 export function __setSessionOverrideForTests(fn: (() => Promise<PublicUser | null>) | null) {
   sessionOverride = fn;
@@ -360,20 +365,29 @@ export async function login(
 ): Promise<PublicUser> {
   const email = normalizeEmail(input.email ?? "");
   const password = input.password ?? "";
+  const wantsAdmin = isAdminEmail(email);
+
+  // An admin account created by the bootstrap code (or by Google) starts with no
+  // password. If the operator set ADMIN_PASSWORD, adopt it now — once — so the
+  // admin can sign in with email + password from then on.
+  if (wantsAdmin) await seedAdminPassword();
+
   const db = await readDb();
   const user = db.users.find((entry) => entry.email === email);
   // Hash even when the email is unknown, so timing does not reveal accounts.
   const known = user ? await verifyPassword(password, user.passwordHash) : await hashPassword(password).then(() => false);
   if (!user || !known) {
+    // For the admin address only, say what to do instead of a bare failure: this
+    // is the one account whose owner cannot reset a password by email.
+    if (wantsAdmin && !user) {
+      throw new AuthError(
+        "The admin account has not been created yet. Open /admin-bootstrap and enter the one-time code from the server log.",
+        401,
+      );
+    }
     throw new AuthError("Email or password is incorrect.", 401);
   }
   assertActive(user);
-  if (isAdminEmail(user.email)) {
-    throw new AuthError(
-      "The admin account signs in with Google. Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or use the one-time bootstrap code from the server log.",
-      403,
-    );
-  }
   const updated = await mutateDb((state) => {
     const record = state.users.find((entry) => entry.id === user.id)!;
     record.lastLoginAt = new Date().toISOString();
@@ -527,6 +541,8 @@ export async function changePassword(
   await mutateDb((state) => {
     const record = state.users.find((entry) => entry.id === userId)!;
     record.passwordHash = passwordHash;
+    // The setup password from .env.local is no longer in use.
+    record.passwordSeeded = false;
     state.sessions = state.sessions.filter((session) => session.userId !== userId);
   });
 }
@@ -856,6 +872,55 @@ export async function adminUpdateUser(
 /* Google sign-in                                                     */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Optional setup password for the admin account (`ADMIN_PASSWORD`).
+ *
+ * Why it exists: the admin normally signs in with Google, and while Google is
+ * unconfigured it uses a one-time bootstrap code. Both can leave the owner
+ * locked out (Google off, code already used, or the code lost with a server
+ * restart). Setting `ADMIN_PASSWORD` gives the admin a normal email + password
+ * sign-in that survives restarts.
+ *
+ * The value lives in `.env.local` (git-ignored) — never in the repository — and
+ * is only used to *seed* the password once. After that the stored scrypt hash is
+ * authoritative, so changing the password in My account really changes it.
+ *
+ * It is deliberately ignored if shorter than the normal minimum length.
+ */
+export function adminPassword(): string | null {
+  const value = process.env.ADMIN_PASSWORD?.trim();
+  if (!value || value.length < PASSWORD_MIN) return null;
+  return value;
+}
+
+/** True when an admin setup password is available for seeding. */
+export function adminPasswordConfigured(): boolean {
+  return adminPassword() !== null;
+}
+
+/**
+ * Give the admin account the setup password if it has none yet.
+ *
+ * Runs on every admin sign-in attempt, so an account created by the bootstrap
+ * code or by Google gains a password the next time the admin tries to sign in.
+ * An existing hash is never replaced — that would undo a password change.
+ */
+async function seedAdminPassword(): Promise<void> {
+  const secret = adminPassword();
+  const email = adminEmail();
+  if (!secret || !email) return;
+  const db = await readDb();
+  const user = db.users.find((entry) => entry.email === email);
+  if (!user || user.passwordHash) return;
+  const passwordHash = await hashPassword(secret);
+  await mutateDb((state) => {
+    const record = state.users.find((entry) => entry.id === user.id);
+    if (!record || record.passwordHash) return;
+    record.passwordHash = passwordHash;
+    record.passwordSeeded = true;
+  });
+}
+
 /** True when Google OAuth has both credentials configured. */
 export function googleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim());
@@ -992,6 +1057,8 @@ export async function adminSignInState() {
     adminExists: Boolean(account),
     googleConfigured: google,
     bootstrapAvailable,
+    // True when ADMIN_PASSWORD is set: the admin can use the email + password form.
+    passwordConfigured: adminPasswordConfigured(),
   };
 }
 
@@ -1045,6 +1112,10 @@ export async function redeemBootstrapCode(
 
   const db = await readDb();
   const existing = db.users.find((user) => user.email === email);
+  // A setup password (if configured) is stored with the account, so the admin can
+  // sign in again at /login without asking for another one-time code.
+  const setupSecret = adminPassword();
+  const setupHash = setupSecret ? await hashPassword(setupSecret) : "";
 
   const user = await mutateDb((state) => {
     if (existing) {
@@ -1053,13 +1124,17 @@ export async function redeemBootstrapCode(
       record.emailVerified = true;
       record.lastLoginAt = new Date().toISOString();
       record.roles = ACCOUNT_ROLES.slice();
+      if (setupHash && !record.passwordHash) {
+        record.passwordHash = setupHash;
+        record.passwordSeeded = true;
+      }
       return record;
     }
     const created: User = {
       id: `usr_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
       email,
       name: "Studio admin",
-      passwordHash: "",
+      passwordHash: setupHash,
       role: state.users.length === 0 ? "owner" : "member",
       roles: ACCOUNT_ROLES.slice(),
       handle: "admin",
@@ -1069,6 +1144,7 @@ export async function redeemBootstrapCode(
       emailVerified: true,
       provider: "bootstrap",
       googleSub: null,
+      passwordSeeded: Boolean(setupHash),
       suspendedAt: null,
       suspendedReason: null,
       createdAt: new Date().toISOString(),

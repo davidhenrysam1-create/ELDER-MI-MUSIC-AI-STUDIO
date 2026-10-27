@@ -14,6 +14,7 @@
  * security.
  */
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import {
   ConfirmButton,
@@ -109,6 +110,27 @@ export default function AdminPage() {
           </div>
         }
       />
+
+      {user?.passwordSeeded ? (
+        <GlassCard className="border-amber-400/30 bg-amber-400/[0.06]">
+          <div className="flex items-start gap-2">
+            <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-amber-300" />
+            <div>
+              <h3 className="text-[12px] font-semibold text-amber-100">
+                You are still using the setup password
+              </h3>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-amber-100/80">
+                The admin password came from <span className="mono">ADMIN_PASSWORD</span> in the
+                server&apos;s <span className="mono">.env.local</span>. Change it now so the setup
+                value stops working — the account keeps every role and all of its data.
+              </p>
+              <Link href="/account" className="btn-primary mt-2 text-[11px]">
+                <Icon name="lock" size={11} /> Change my password
+              </Link>
+            </div>
+          </div>
+        </GlassCard>
+      ) : null}
 
       {/* Totals */}
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

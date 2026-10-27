@@ -51,7 +51,7 @@ export const CAPABILITIES: Capability[] = [
     area: "Platform",
     status: "ready",
     detail:
-      "The account named by ADMIN_EMAIL can list all accounts with their projects, files, storage and live share links, then set roles, mark an address verified, suspend (which ends that session immediately) or delete an account and its work.",
+      "The account named by ADMIN_EMAIL can list all accounts with their projects, files, storage and live share links, then set roles, mark an address verified, suspend (which ends that session immediately) or delete an account and its work. Admin sign-in: optional ADMIN_PASSWORD setup password, Google, or a one-time bootstrap code.",
   },
   {
     name: "Continue with Google",

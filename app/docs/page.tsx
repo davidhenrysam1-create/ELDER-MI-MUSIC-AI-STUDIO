@@ -43,6 +43,11 @@ const ENV_VARS = [
       "Optional. A fixed one-time code for /admin-bootstrap while Google is unconfigured (single use, 24 h). If unset, a random code is printed in the server log at start-up.",
   },
   {
+    key: "ADMIN_PASSWORD",
+    detail:
+      "Optional, 8+ characters. Seeds the admin password once so /login works with ADMIN_EMAIL and this value, even after a restart. Change it in My account; the setup value then stops working. Keep it in .env.local, never in git.",
+  },
+  {
     key: "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET",
     detail:
       "Optional. Enables Continue with Google. Register /api/auth/google/callback as an authorised redirect URI. Without them the button reads awaiting configuration.",
@@ -326,8 +331,10 @@ export default function DocsPage() {
             verify, suspend (which ends that account&apos;s sessions at once) or delete an account.
           </li>
           <li>
-            <span className="text-softwhite">Getting in as admin:</span> Google sign-in with that address,
-            or — while Google is unconfigured — the one-time code printed in the server log, entered at{" "}
+            <span className="text-softwhite">Getting in as admin:</span> email + password with{" "}
+            <span className="mono">ADMIN_PASSWORD</span> from <span className="mono">.env.local</span>{" "}
+            (change it in My account once you are in), Google sign-in with that address, or — while Google
+            is unconfigured — the one-time code printed in the server log at{" "}
             <span className="mono">/admin-bootstrap</span>. No admin password lives in the repository.
           </li>
         </ul>

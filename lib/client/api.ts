@@ -88,6 +88,8 @@ export interface AccountUser {
   isAdmin?: boolean;
   emailVerified?: boolean;
   provider?: "password" | "google" | "bootstrap";
+  /** True while the admin still uses the setup password from ADMIN_PASSWORD. */
+  passwordSeeded?: boolean;
   suspendedAt?: string | null;
   suspendedReason?: string | null;
   createdAt: string;
@@ -114,6 +116,8 @@ export interface MeResponse {
     adminExists: boolean;
     googleConfigured: boolean;
     bootstrapAvailable: boolean;
+    /** True when ADMIN_PASSWORD is set, so the admin can use the form above. */
+    passwordConfigured?: boolean;
   };
   email?: { configured: boolean; from: string | null; reason: string };
 }

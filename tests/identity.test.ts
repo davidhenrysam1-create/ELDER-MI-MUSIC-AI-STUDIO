@@ -362,6 +362,75 @@ describe("role guards on the studio APIs", () => {
   });
 });
 
+describe("admin setup password (ADMIN_PASSWORD)", () => {
+  const SETUP = "setup-password-123";
+
+  it("ignores a setup password shorter than the minimum", async () => {
+    process.env.ADMIN_PASSWORD = "short";
+    try {
+      expect(auth.adminPassword()).toBeNull();
+      expect(auth.adminPasswordConfigured()).toBe(false);
+    } finally {
+      delete process.env.ADMIN_PASSWORD;
+    }
+  });
+
+  it("lets the admin sign in with email + password and marks it as seeded", async () => {
+    process.env.ADMIN_PASSWORD = SETUP;
+    try {
+      // The admin exists from the bootstrap test above and has no password yet.
+      const user = await auth.login({ email: ADMIN, password: SETUP }, "vitest");
+      expect(user.isAdmin).toBe(true);
+      expect(user.passwordSeeded).toBe(true);
+      expect(user.email).toBe(ADMIN);
+    } finally {
+      delete process.env.ADMIN_PASSWORD;
+    }
+  });
+
+  it("refuses a wrong admin password instead of guessing", async () => {
+    await expect(
+      auth.login({ email: ADMIN, password: "definitely-not-it" }, "vitest"),
+    ).rejects.toThrow(/incorrect/i);
+  });
+
+  it("clears the seeded flag when the password is changed, and the old one stops working", async () => {
+    const before = await auth.login({ email: ADMIN, password: SETUP }, "vitest");
+    expect(before.passwordSeeded).toBe(true);
+
+    await auth.changePassword(before.id, {
+      currentPassword: SETUP,
+      newPassword: "a-new-admin-password",
+    });
+
+    await expect(auth.login({ email: ADMIN, password: SETUP }, "vitest")).rejects.toThrow(/incorrect/i);
+    const after = await auth.login({ email: ADMIN, password: "a-new-admin-password" }, "vitest");
+    expect(after.passwordSeeded).toBe(false);
+  });
+
+  it("seeds the password when the bootstrap code creates the admin", async () => {
+    // A clean slate: remove the admin account, then redeem a fresh code with a
+    // setup password configured, exactly as a new deployment would.
+    const admin = (await auth.listUsers()).find((entry) => entry.email === ADMIN)!;
+    await auth.deleteUser(admin.id);
+
+    process.env.ADMIN_PASSWORD = "seeded-by-bootstrap";
+    process.env.ADMIN_BOOTSTRAP_CODE = "FRESH-CODE-123";
+    try {
+      // Forget the code used earlier in this file, then issue a fresh one.
+      auth.__resetBootstrapForTests();
+      auth.currentBootstrapCode();
+      const created = await auth.redeemBootstrapCode("FRESH-CODE-123", "vitest");
+      expect(created.passwordSeeded).toBe(true);
+      const signedIn = await auth.login({ email: ADMIN, password: "seeded-by-bootstrap" }, "vitest");
+      expect(signedIn.isAdmin).toBe(true);
+    } finally {
+      delete process.env.ADMIN_PASSWORD;
+      process.env.ADMIN_BOOTSTRAP_CODE = "TEST-BOOTSTRAP-CODE";
+    }
+  });
+});
+
 describe("email verification", () => {
   it("marks the address verified from a valid token, once", async () => {
     const user = await member("verify");

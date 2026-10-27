@@ -244,6 +244,12 @@ Google-verified address is accepted. `signInWithGoogle()` links by `googleSub` f
 creates the account if neither exists (provider `google`, `emailVerified: true`) and refuses suspended
 accounts. Reckless auto-linking is avoided because Google has already proven the address.
 
+**Admin setup password.** `ADMIN_PASSWORD` (≥ 8 characters, read from the environment) seeds the admin's
+scrypt hash exactly once: `seedAdminPassword()` runs on every admin sign-in attempt and only fills an
+**empty** hash, and `redeemBootstrapCode()` stores it when it creates the account. The stored hash is then
+authoritative — `changePassword()` replaces it and clears `passwordSeeded`, which is what drives the
+"still using the setup password" banner in `/admin`. The value never appears in the repository.
+
 **Bootstrap code** exists only so the owner can reach `/admin` before Google is configured: a random code
 (or `ADMIN_BOOTSTRAP_CODE`), hashed with SHA-256, single use, 24-hour expiry, printed to the server log and
 never emailed. It is refused outright once Google is configured. No admin password is stored anywhere.
