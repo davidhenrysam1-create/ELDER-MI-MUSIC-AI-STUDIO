@@ -1,3 +1,4 @@
+import { guard } from "@/lib/server/auth";
 import { getProject } from "@/lib/server/repo";
 import { readAudio } from "@/lib/server/storage";
 import { jsonError } from "@/lib/server/validation";
@@ -11,13 +12,15 @@ type Params = { params: Promise<{ assetId: string }> };
  * seek without re-downloading the whole file.
  */
 export async function GET(request: Request, { params }: Params) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const { assetId } = await params;
   const url = new URL(request.url);
   const projectId = url.searchParams.get("projectId");
   const download = url.searchParams.get("download") === "1";
 
   if (!projectId) return jsonError("projectId query parameter is required");
-  const project = await getProject(projectId);
+  const project = await getProject(projectId, auth.user.id);
   if (!project) return jsonError("Project not found", 404);
   const asset = project.assets.find((a) => a.id === assetId);
   if (!asset) return jsonError("Audio object not found", 404);

@@ -38,10 +38,26 @@ async function createProject(name = "API Test") {
   return body.project.id;
 }
 
+/**
+ * Route handlers now require a signed-in account. These tests run outside a
+ * Next.js request scope, so they state the session explicitly through the
+ * test-only override instead of forging a cookie.
+ */
+const TEST_USER = {
+  id: "usr_api_test",
+  email: "tester@studio.test",
+  name: "API Tester",
+  role: "owner" as const,
+  createdAt: new Date().toISOString(),
+  lastLoginAt: new Date().toISOString(),
+};
+
 beforeAll(async () => {
   tmpDir = await mkdtemp(path.join(os.tmpdir(), "eldermi-api-"));
   process.env.DATA_DIR = tmpDir;
   vi.resetModules();
+  const auth = await import("@/lib/server/auth");
+  auth.__setSessionOverrideForTests(async () => TEST_USER);
   projectsRoute = await import("@/app/api/projects/route");
   projectRoute = await import("@/app/api/projects/[id]/route");
   assetsRoute = await import("@/app/api/projects/[id]/assets/route");
@@ -56,6 +72,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  const auth = await import("@/lib/server/auth");
+  auth.__setSessionOverrideForTests(null);
   await rm(tmpDir, { recursive: true, force: true });
 });
 

@@ -41,7 +41,10 @@ export const defaultSettings: StudioSettings = {
 };
 
 const emptyDb = (): Database => ({
-  version: 1,
+  version: 2,
+  users: [],
+  sessions: [],
+  shares: [],
   projects: [],
   exports: [],
   voiceProfiles: [],
@@ -132,6 +135,14 @@ function migrate(db: Database) {
   });
   db.exports = db.exports ?? [];
   db.voiceProfiles = db.voiceProfiles ?? [];
+  // Accounts, sessions and share links were added in version 2. Existing
+  // projects keep `ownerId: null` and are claimed by the first account.
+  db.users = db.users ?? [];
+  db.sessions = (db.sessions ?? []).filter((session) => Boolean(session?.userId));
+  db.shares = db.shares ?? [];
+  db.projects = db.projects.map((p) => ({ ...p, ownerId: p.ownerId ?? null }));
+  db.exports = db.exports.map((e) => ({ ...e, ownerId: e.ownerId ?? null }));
+  db.voiceProfiles = db.voiceProfiles.map((v) => ({ ...v, ownerId: v.ownerId ?? null }));
   // Generation jobs and the spend ledger were added later; backfill them so an
   // older database keeps working without a manual migration.
   db.generations = (db.generations ?? []).map((job) => ({

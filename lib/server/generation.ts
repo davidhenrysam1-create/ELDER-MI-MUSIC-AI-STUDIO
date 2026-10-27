@@ -105,8 +105,11 @@ async function saveJob(job: GenerationJob): Promise<GenerationJob> {
 export async function createGeneration(
   projectId: string,
   input: CreateGenerationInput,
+  ownerId?: string,
 ): Promise<GenerationOutcome> {
-  const project = await getProject(projectId);
+  // Ownership is checked before anything else: a job may only be created for a
+  // project the caller owns, and the same check hides other people's projects.
+  const project = await getProject(projectId, ownerId);
   if (!project) {
     throw new ProviderError("Project not found", { status: 404 });
   }
@@ -205,10 +208,17 @@ export async function createGeneration(
  *
  * Called by `GET /api/generate/[id]`; the client polls while it holds a job id.
  */
-export async function advanceGeneration(jobId: string): Promise<GenerationOutcome | null> {
+export async function advanceGeneration(
+  jobId: string,
+  ownerId?: string,
+): Promise<GenerationOutcome | null> {
   const db = await readDb();
   const existing = db.generations.find((entry) => entry.id === jobId);
   if (!existing) return null;
+  if (ownerId !== undefined) {
+    const project = db.projects.find((entry) => entry.id === existing.projectId);
+    if (!project || project.ownerId !== ownerId) return null;
+  }
 
   // Finished jobs are terminal: never re-poll and never re-charge.
   if (existing.status === "completed" || existing.status === "cancelled") {
@@ -250,10 +260,17 @@ export async function advanceGeneration(jobId: string): Promise<GenerationOutcom
 }
 
 /** Cancel a job; pending vendor operations are cancelled on a best-effort basis. */
-export async function cancelGeneration(jobId: string): Promise<GenerationJob | null> {
+export async function cancelGeneration(
+  jobId: string,
+  ownerId?: string,
+): Promise<GenerationJob | null> {
   const db = await readDb();
   const job = db.generations.find((entry) => entry.id === jobId);
   if (!job) return null;
+  if (ownerId !== undefined) {
+    const project = db.projects.find((entry) => entry.id === job.projectId);
+    if (!project || project.ownerId !== ownerId) return null;
+  }
   if (job.status === "completed" || job.status === "failed") return job;
 
   if (job.providerJobId) {
@@ -271,12 +288,23 @@ export async function cancelGeneration(jobId: string): Promise<GenerationJob | n
   return saveJob(cancelled);
 }
 
-/** List jobs for one project (newest first). */
-export async function listGenerations(projectId?: string): Promise<GenerationJob[]> {
+/**
+ * List jobs newest first.
+ *
+ * With `ownerId`, only jobs whose project belongs to that account are returned,
+ * so the dashboard cannot leak another producer's prompts or spend.
+ */
+export async function listGenerations(
+  projectId?: string,
+  ownerId?: string,
+): Promise<GenerationJob[]> {
   const db = await readDb();
-  const jobs = projectId
-    ? db.generations.filter((entry) => entry.projectId === projectId)
-    : db.generations;
+  const ownedProjects = new Set(
+    db.projects.filter((project) => ownerId === undefined || project.ownerId === ownerId).map((p) => p.id),
+  );
+  const jobs = db.generations.filter(
+    (entry) => ownedProjects.has(entry.projectId) && (!projectId || entry.projectId === projectId),
+  );
   return [...jobs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 

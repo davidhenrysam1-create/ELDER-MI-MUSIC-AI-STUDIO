@@ -36,6 +36,16 @@ export interface GenerationOutcome {
   asset: AssetMeta | null;
 }
 
+/** Error carrying the HTTP status, so callers can react to 401/403/402. */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -52,12 +62,109 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
       data && typeof data === "object" && "error" in data
         ? String((data as { error: unknown }).error)
         : `Request failed (${res.status})`;
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
   return data as T;
 }
 
+/* ------------------------------------------------------------------ */
+/* Account types                                                       */
+/* ------------------------------------------------------------------ */
+
+/** The signed-in account as the API exposes it (never includes a hash). */
+export interface AccountUser {
+  id: string;
+  email: string;
+  name: string;
+  role: "owner" | "member";
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface SessionSummary {
+  id: string;
+  device: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface MeResponse {
+  user: AccountUser | null;
+  sessions: SessionSummary[];
+  signupOpen: boolean;
+  allowSignupEnv: boolean;
+}
+
+/** Owner-facing view of a share link (no token, no passcode). */
+export interface ShareSummary {
+  id: string;
+  projectId: string;
+  projectName: string;
+  ownerId: string;
+  label: string;
+  allowDownload: boolean;
+  requiresPasscode: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+  opens: number;
+  downloads: number;
+  lastOpenedAt: string | null;
+  expired: boolean;
+  active: boolean;
+}
+
 export const api = {
+  /* ---------------- accounts ---------------- */
+  me: () => jsonFetch<MeResponse>("/api/auth/me"),
+  signup: (body: { name: string; email: string; password: string }) =>
+    jsonFetch<{ user: AccountUser }>("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  login: (body: { email: string; password: string }) =>
+    jsonFetch<{ user: AccountUser }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  logout: () => jsonFetch<{ ok: true }>("/api/auth/logout", { method: "POST" }),
+  updateMe: (body: { name: string }) =>
+    jsonFetch<{ user: AccountUser }>("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    jsonFetch<{ ok: true; signedOut: boolean }>("/api/auth/password", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteAccount: (body: { password: string }) =>
+    jsonFetch<{ ok: true }>("/api/auth/me", {
+      method: "DELETE",
+      body: JSON.stringify(body),
+    }),
+
+  /* ---------------- sharing ---------------- */
+  shares: () => jsonFetch<{ shares: ShareSummary[] }>("/api/shares"),
+  createShare: (body: {
+    projectId: string;
+    label?: string;
+    allowDownload?: boolean;
+    expiresInDays?: number | null;
+    passcode?: string | null;
+  }) =>
+    jsonFetch<{ share: ShareSummary; token: string; path: string }>("/api/shares", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  revokeShare: (id: string) =>
+    jsonFetch<{ ok: true }>(`/api/shares/${id}`, { method: "DELETE" }),
+  unlockShare: (token: string, passcode: string) =>
+    jsonFetch<{ ok: true }>(`/api/share/${token}/unlock`, {
+      method: "POST",
+      body: JSON.stringify({ passcode }),
+    }),
+
   projects: () => jsonFetch<{ projects: Project[] }>("/api/projects"),
   project: (id: string) => jsonFetch<{ project: Project }>(`/api/projects/${id}`),
   createProject: (body: { name: string; genre: string; bpm: number; musicalKey: string }) =>
@@ -106,6 +213,8 @@ export const api = {
   system: () =>
     jsonFetch<{
       version: string;
+      /** The signed-in account, echoed by the server so the shell can greet it. */
+      user?: AccountUser;
       settings: StudioSettings;
       storage: { audioBytes: number; exportBytes: number };
       providers: {

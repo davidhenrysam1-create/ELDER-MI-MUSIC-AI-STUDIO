@@ -122,6 +122,22 @@ const FAQ: { q: string; a: string }[] = [
     a: "Not for upload, mixing, vocal layering, mastering or export: your files stay on the studio server you run, and rendering plus measurement happen in your browser. Two optional outbound paths exist. Text prompts go to Gemini for prompt improvement / mixing suggestions, only if GEMINI_API_KEY is set. And if you use the Generate panel, your written brief goes to the music provider you picked, which returns a rendered file; that only happens when you press Generate with paid generation enabled.",
   },
   {
+    q: "How do friends listen to my song?",
+    a: "Open Share with friends, pick the project, choose whether they may download it and whether it expires, then press Create listening link. Copy the link the moment it appears — only a hash of it is stored, so it cannot be shown again — and send it by WhatsApp or message. Your friend opens it in any browser: no account, no app. They hear only the audio on your mixer and never see your settings or other projects. Revoke it any time and it stops working immediately.",
+  },
+  {
+    q: "Can another account see my projects?",
+    a: "No. Every project, audio object, export, voice profile and share link belongs to the account that created it, and the server checks that owner on every request. Trying another account's id returns “not found”, so ids cannot be probed. The one exception is a project you deliberately share: the link exposes that project's mixer audio, read-only.",
+  },
+  {
+    q: "I forgot my password — can you email me a reset link?",
+    a: "No, and the studio does not pretend otherwise: this build has no mail service. While signed in you can change the password in My account (which signs every device out). If you are locked out, the person running the studio server can reset it from the machine that stores .data/db.json.",
+  },
+  {
+    q: "How do I add a bandmate or a friend as a user?",
+    a: "Send them the studio address and let them create an account on the sign-up screen — each account gets its own separate library. If the studio is exposed to the internet and you want to control who joins, set ALLOW_SIGNUP=false and create the first account yourself; after that, new sign-ups are refused.",
+  },
+  {
     q: "How do I generate a beat, a song or a vocal hook?",
     a: "Add one generation key to .env.local — GOOGLE_API_KEY + GOOGLE_VERTEX_PROJECT (Lyria 2), STABILITY_API_KEY (Stable Audio 2), ELEVENLABS_API_KEY (ElevenLabs Music) or REPLICATE_API_TOKEN (MusicGen) — and restart the studio. Then open Settings → AI music generation, switch on Allow paid generation and set a small spend cap, and use the Generate panel in Sam Mix Studio (beats, instrumentals) or Sam Vocal Studio (songs, vocal hooks). No key is included with this app: keys are issued by the provider to your own account and billed by them.",
   },
@@ -179,6 +195,14 @@ const TROUBLESHOOT = [
   {
     symptom: "Prompt improvement says “local-heuristic”",
     fix: "No Gemini key is configured. The local production rule engine produced the result — add GEMINI_API_KEY to .env.local and restart for model-driven output.",
+  },
+  {
+    symptom: "I am sent back to the sign-in screen",
+    fix: "Your session expired (30 days) or the studio was restarted with a different data directory. Sign in again; the page you were on is preserved in the address. If it happens immediately every time, check the browser is not blocking cookies for this site.",
+  },
+  {
+    symptom: "A shared link says “This link is not active”",
+    fix: "It expired, was revoked by the producer, or the address is mistyped. Links are shown once when created, so ask the producer for a fresh one — they can make another in seconds.",
   },
   {
     symptom: "Generate fails with 401 / 403 / 429",

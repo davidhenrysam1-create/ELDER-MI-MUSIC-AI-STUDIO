@@ -1,3 +1,4 @@
+import { guard } from "@/lib/server/auth";
 import { mixRecommendations } from "@/lib/server/promptEngine";
 import { asString, asRole, jsonError } from "@/lib/server/validation";
 import type { MixPresetId, StemRole } from "@/lib/types";
@@ -5,6 +6,8 @@ import type { MixPresetId, StemRole } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return jsonError("Invalid JSON body");
   const prompt = asString(body.prompt, "", 2000).trim();

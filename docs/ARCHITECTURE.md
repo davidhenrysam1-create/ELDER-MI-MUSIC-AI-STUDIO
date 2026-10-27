@@ -157,6 +157,55 @@ instructions instead of a generate button.
 ElevenLabs 0.01, MusicGen 0.0009 USD/s) rounded to cents, stored in `db.spend.lifetimeUsd`. They are
 tracked, not billed: the vendor invoice is authoritative and every screen says so.
 
+## 5c. Accounts, sessions and sharing (`lib/server/auth.ts`, `lib/server/shares.ts`)
+
+**Model** (`lib/types.ts`): `User` (salt+scrypt hash, role `owner|member`), `SessionRecord` (SHA-256 of
+the cookie token, expiry, device label), `ShareLink` (SHA-256 of the link token, optional scrypt
+passcode hash, expiry, revoke timestamp, counters). `Project`, `ExportRecord` and `VoiceProfile` carry
+`ownerId`; `Database.version` is now `2` and `migrate()` backfills `ownerId: null` for pre-account data.
+
+**Sign-up / sign-in**
+
+1. `POST /api/auth/signup` validates name (2–60), email shape, password 8–200 chars, refuses a duplicate
+   email (409) and, when `ALLOW_SIGNUP=false`, refuses every account after the first (403).
+2. The first account becomes `owner` and `claimOrphans()` assigns every project, export, profile and
+   share with `ownerId: null` to it — atomically, inside the same mutation.
+3. `startSession()` mints a 32-byte token, stores `sha256(token)` with a 30-day expiry and sets an
+   `HttpOnly`, `SameSite=Lax`, `Secure`-in-production cookie. Expired sessions are pruned on write and
+   on read.
+4. `login()` verifies with scrypt and a timing-safe compare, and hashes the supplied password even when
+   the email is unknown so the response time does not reveal accounts.
+5. `changePassword()` re-verifies the current password, rehashes, and deletes every session for that
+   user; `endSession()` deletes only the current one.
+
+**Authorisation**
+
+- `guard()` is called at the top of every protected route and returns either the `PublicUser` or a
+  ready-made `401` JSON response.
+- Repository reads take an owner id: `listProjects(ownerId)`, `getProject(id, ownerId)`,
+  `listExports(ownerId)`, `listVoiceProfiles(ownerId)`. A cross-account id returns `null` → `404`, so
+  ids cannot be probed.
+- `middleware.ts` checks `STUDIO_PASSWORD` (optional Basic auth) and that the session cookie exists;
+  it never trusts the cookie's contents.
+- `__setSessionOverrideForTests()` is a module-level seam used by unit tests that call handlers outside a
+  request scope. It is not reachable from HTTP, env or headers.
+
+**Share links**
+
+- `createShare()` requires ownership, hashes the passcode, mints a 192-bit token and stores only
+  `sha256(token)`. The plaintext token is returned **once**.
+- `findShare(token)` returns `null` for unknown, revoked or expired links, so every entry point (page,
+  audio, download, unlock) fails closed.
+- `sharedProjectView()` exposes project metadata plus **only tracks whose asset still exists**, so
+  files that were never placed on the mixer stay private.
+- `sharedAsset(share, assetId, intent)` re-checks membership on the mixer and, for `download`, the
+  `allowDownload` flag.
+- Passcodes: `unlockShare()` verifies the scrypt hash and sets a per-link cookie whose value is
+  `sha256(shareId:passcodeHash:tokenHash)`. `isUnlocked()` recomputes it, so the cookie cannot be forged
+  without the stored hash and cannot be reused on another link.
+- Counters (`opens`, `downloads`, `lastOpenedAt`) are incremented on stream start and on successful
+  download only. Nothing else about the visitor is stored.
+
 ## 6. API surface
 
 | Route | Methods | Notes |
@@ -175,7 +224,17 @@ tracked, not billed: the vendor invoice is authoritative and every screen says s
 | `/api/prompt/improve` | POST | Gemini or labelled local engine |
 | `/api/mix/recommendations` | POST | validated recommendation stages |
 | `/api/system` | GET | providers, engines, storage, settings |
-| `/api/settings` | GET, PATCH, DELETE | defaults / purge; `allowPaidGeneration`, `spendCapUsd` |
+| `/api/settings` | GET, PATCH, DELETE | defaults / purge (own data); `allowPaidGeneration`, `spendCapUsd` |
+| `/api/auth/signup` | POST | create account, first one becomes owner |
+| `/api/auth/login` | POST | sign in, sets the session cookie |
+| `/api/auth/logout` | POST | delete the current session |
+| `/api/auth/me` | GET, PATCH, DELETE | profile + sessions / rename / close account |
+| `/api/auth/password` | POST | change password, revokes all sessions |
+| `/api/shares` | GET, POST | list own links / create one (token returned once) |
+| `/api/shares/:id` | DELETE | revoke immediately |
+| `/api/share/:token/unlock` | POST | verify passcode, sets a link cookie |
+| `/api/share/:token/audio/:assetId` | GET | stream (Range), passcode-gated |
+| `/api/share/:token/download/:assetId` | GET | download, only if the owner allowed it |
 | `/api/providers` | GET | generation catalogue, licence, cost estimate, spend summary |
 | `/api/generate` | GET, POST | list jobs / create (budget-gated, 403/402/400) |
 | `/api/generate/:id` | GET, DELETE | advance a pending job / cancel and charge nothing |
@@ -183,7 +242,7 @@ tracked, not billed: the vendor invoice is authoritative and every screen says s
 ## 7. UI system
 
 - `components/shell/*`: persistent navigation, project switcher, save status, notifications,
-  mobile drawer, global player.
+  mobile drawer, global player, account card + sign-out.
 - `components/audio/*`: canvas waveform (real peaks, keyboard-seekable), upload zone with
   validation feedback, section overlay, transport.
 - `components/studio/*`: prompt editor with labelled results, analysis panel, mixer strips and
@@ -212,8 +271,16 @@ One codebase serves every screen size; there is no separate mobile build.
 - Global 48 kHz Web Audio working rate; file metadata reports the header rate where available.
 - Rendering happens on one thread per job; long files are chunked with progress yields but not
   worker-pooled yet.
-- Single-operator storage: `.data` on disk. Multi-tenant hosting requires swapping the repository
-  layer.
+- Storage is single-node: JSON index + files in `.data`. Accounts are isolated logically, not
+  physically; horizontal scaling means swapping `lib/server/db.ts` for Postgres and object storage.
+- No email service: no verification, no password-reset mail, no email change. Recovery is by the person
+  running the server, and the UI says so rather than implying a link was sent.
+- Sessions are server-side rows, not stateless JWTs: revoking is immediate and reliable, but every
+  request reads the JSON store (fine for a studio, not for thousands of concurrent users).
+- Share links are bearer tokens. Anyone holding one can listen; a passcode is the only second factor, so
+  send link and passcode through different channels for sensitive material.
+- `purgeAllData(ownerId)` deletes only the signed-in account's data; a whole-disk wipe is a server
+  operation.
 - Rendering happens on the client device, so a phone is slower than a laptop for long bounces; the
   render section selector exists for that.
 - Generated audio quality and licensing are the vendor's; the licence string is stored per asset but the

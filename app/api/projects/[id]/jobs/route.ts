@@ -1,4 +1,5 @@
-import { patchProject } from "@/lib/server/repo";
+import { guard } from "@/lib/server/auth";
+import { getProject, patchProject } from "@/lib/server/repo";
 import { asNumber, asString, jsonError } from "@/lib/server/validation";
 import type { JobRecord, StudioId } from "@/lib/types";
 
@@ -11,7 +12,10 @@ const STATUSES: JobRecord["status"][] = ["queued", "running", "completed", "fail
 
 /** Persist the lifecycle of a real client-side render job. */
 export async function POST(request: Request, { params }: Params) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const { id } = await params;
+  if (!(await getProject(id, auth.user.id))) return jsonError("Project not found", 404);
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return jsonError("Invalid JSON body");
 

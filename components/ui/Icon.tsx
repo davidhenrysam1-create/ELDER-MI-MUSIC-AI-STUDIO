@@ -45,6 +45,8 @@ const paths: Record<string, string> = {
   library: "M4 5h4v14H4V5Zm6 0h4v14h-4V5Zm6 2 3.5-1 3 13-3.5 1-3-13Z",
   file: "M6 2h8l4 4v16H6V2Zm8 0v5h5",
   eye: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Zm10-2.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z",
+  user: "M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm-7 17a7 7 0 0 1 14 0",
+  link: "M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1",
   volume: "M4 10v4h3l4 4V6L7 10H4Zm11-3a5 5 0 0 1 0 10M17.5 4.5a8 8 0 0 1 0 15",
   volumeMute: "M4 10v4h3l4 4V6L7 10H4Zm11 1 5 5m0-5-5 5",
 };

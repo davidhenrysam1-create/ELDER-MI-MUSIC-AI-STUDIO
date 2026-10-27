@@ -7,6 +7,16 @@ import type { Project } from "@/lib/types";
 const project: Project = emptyProject("Render Test", "Afrobeats", 104, "F# minor");
 
 const ctx = vi.hoisted(() => ({
+  user: {
+    id: "usr_page_test",
+    email: "tester@studio.test",
+    name: "Page Tester",
+    role: "owner",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    lastLoginAt: null,
+  },
+  signupOpen: true,
+  signOut: vi.fn(),
   ready: true,
   loading: false,
   loadError: null,
@@ -91,6 +101,10 @@ const pages = [
   { name: "Voice profiles", file: "@/app/voice-profiles/page", heading: /My Voice Profiles/i },
   { name: "Exports", file: "@/app/exports/page", heading: /Export History|Exports/i },
   { name: "Settings", file: "@/app/settings/page", heading: /Settings/i },
+  { name: "Account", file: "@/app/account/page", heading: /My account/i },
+  { name: "Share with friends", file: "@/app/shares/page", heading: /Share with friends/i },
+  { name: "Sign in", file: "@/app/login/page", heading: /Sign in/i },
+  { name: "Create account", file: "@/app/signup/page", heading: /Create your account/i },
   { name: "Docs", file: "@/app/docs/page", heading: /Studio documentation/i },
   { name: "Help", file: "@/app/help/page", heading: /Help/i },
 ] as const;

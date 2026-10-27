@@ -1,3 +1,4 @@
+import { guard } from "@/lib/server/auth";
 import { getProject } from "@/lib/server/repo";
 import { patchProject } from "@/lib/server/repo";
 import {
@@ -35,8 +36,10 @@ type Params = { params: Promise<{ id: string }> };
  *  - createTrack: "true" to also add an editable mixer channel for the asset.
  */
 export async function POST(request: Request, { params }: Params) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const { id } = await params;
-  const project = await getProject(id);
+  const project = await getProject(id, auth.user.id);
   if (!project) return jsonError("Project not found", 404);
 
   const settings = await getSettings();

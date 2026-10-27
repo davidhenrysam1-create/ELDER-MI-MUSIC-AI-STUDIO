@@ -1,8 +1,24 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { improvePrompt, mixRecommendations } from "@/lib/server/promptEngine";
 import { applyPresetToTracks, emptyProject, guessRoleFromName, makeTrack } from "@/lib/projects";
 
 const ctx = { genre: "Afrobeats", bpm: 104, key: "F# minor" };
+
+/**
+ * The mix-recommendation route now requires a signed-in account. Route calls in
+ * this unit test have no request scope, so they use the test-only override.
+ */
+beforeAll(async () => {
+  const auth = await import("@/lib/server/auth");
+  auth.__setSessionOverrideForTests(async () => ({
+    id: "usr_prompt_test",
+    email: "prompt@studio.test",
+    name: "Prompt Tester",
+    role: "owner",
+    createdAt: new Date().toISOString(),
+    lastLoginAt: null,
+  }));
+});
 
 afterEach(() => {
   delete process.env.GEMINI_API_KEY;

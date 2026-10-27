@@ -95,6 +95,9 @@ export function emptyProject(
   const ts = nowIso();
   return {
     id: uid("prj"),
+    // Ownership is assigned by the caller (the signed-in account). Projects
+    // restored from a pre-accounts database keep `null` until claimed.
+    ownerId: null,
     name: name.trim() || "Untitled session",
     genre,
     bpm,

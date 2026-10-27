@@ -7,6 +7,7 @@
  * The response always includes the real job state. A failed job is returned with
  * a non-2xx status *and* the stored job, so the UI can show the vendor's message.
  */
+import { guard } from "@/lib/server/auth";
 import { createGeneration, listGenerations } from "@/lib/server/generation";
 import { isProviderId } from "@/lib/server/providers/registry";
 import { ProviderError, type GenerationKind } from "@/lib/server/providers/types";
@@ -19,11 +20,15 @@ export const maxDuration = 300;
 const KINDS: GenerationKind[] = ["beat", "instrumental", "song", "vocals"];
 
 export async function GET(request: Request) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const projectId = new URL(request.url).searchParams.get("projectId") ?? undefined;
-  return Response.json({ jobs: await listGenerations(projectId) });
+  return Response.json({ jobs: await listGenerations(projectId, auth.user.id) });
 }
 
 export async function POST(request: Request) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return jsonError("Invalid JSON body");
 
@@ -46,7 +51,7 @@ export async function POST(request: Request) {
       negativePrompt: asString(body.negativePrompt, "", 600) || undefined,
       durationSec: asNumber(body.durationSec, 30, 1, 300),
       seed: body.seed == null ? undefined : asNumber(body.seed, 0, 0, 1_000_000),
-    });
+    }, auth.user.id);
     // 200 even when the provider failed at runtime: the job is the payload.
     return Response.json(outcome);
   } catch (err) {

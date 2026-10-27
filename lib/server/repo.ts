@@ -16,22 +16,38 @@ import type {
 } from "@/lib/types";
 import { emptyProject, nowIso } from "@/lib/projects";
 
-export async function listProjects() {
+/**
+ * Every read below takes the owner id and filters by it.
+ *
+ * Passing `undefined` is reserved for internal jobs (generation, migrations) —
+ * HTTP routes always pass the signed-in account, so one producer can never read
+ * or mutate another producer's session.
+ */
+export async function listProjects(ownerId?: string) {
   const db = await readDb();
-  return [...db.projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return db.projects
+    .filter((p) => (ownerId === undefined ? true : p.ownerId === ownerId))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export async function getProject(id: string) {
+/** Fetch one project, optionally requiring that `ownerId` owns it. */
+export async function getProject(id: string, ownerId?: string) {
   const db = await readDb();
-  return db.projects.find((p) => p.id === id) ?? null;
+  const project = db.projects.find((p) => p.id === id) ?? null;
+  if (!project) return null;
+  if (ownerId !== undefined && project.ownerId !== ownerId) return null;
+  return project;
 }
 
-export async function createProject(input: {
-  name: string;
-  genre?: Genre;
-  bpm?: number;
-  musicalKey?: string;
-}) {
+export async function createProject(
+  input: {
+    name: string;
+    genre?: Genre;
+    bpm?: number;
+    musicalKey?: string;
+  },
+  ownerId: string | null = null,
+) {
   return mutateDb((db) => {
     const project = emptyProject(
       input.name,
@@ -39,6 +55,7 @@ export async function createProject(input: {
       input.bpm ?? 104,
       input.musicalKey ?? "F# minor",
     );
+    project.ownerId = ownerId;
     db.projects.unshift(project);
     return project;
   });
@@ -71,9 +88,11 @@ export async function patchProject(
   });
 }
 
-export async function deleteProject(id: string) {
+export async function deleteProject(id: string, ownerId?: string) {
   return mutateDb(async (db) => {
-    const idx = db.projects.findIndex((p) => p.id === id);
+    const idx = db.projects.findIndex(
+      (p) => p.id === id && (ownerId === undefined || p.ownerId === ownerId),
+    );
     if (idx < 0) return false;
     const [project] = db.projects.splice(idx, 1);
     // Remove every private audio object owned by this project.
@@ -91,12 +110,13 @@ export async function deleteProject(id: string) {
   });
 }
 
-export async function duplicateProject(id: string) {
-  const source = await getProject(id);
+export async function duplicateProject(id: string, ownerId?: string) {
+  const source = await getProject(id, ownerId);
   if (!source) return null;
   const copy: Project = {
     ...structuredClone(source),
     id: `prj_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
+    ownerId: source.ownerId,
     name: `${source.name} (copy)`,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -211,9 +231,11 @@ export async function recordJob(
   });
 }
 
-export async function listExports() {
+export async function listExports(ownerId?: string) {
   const db = await readDb();
-  return [...db.exports].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return db.exports
+    .filter((record) => (ownerId === undefined ? true : record.ownerId === ownerId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function addExport(record: ExportRecord) {
@@ -224,9 +246,11 @@ export async function addExport(record: ExportRecord) {
   });
 }
 
-export async function deleteExport(id: string) {
+export async function deleteExport(id: string, ownerId?: string) {
   return mutateDb(async (db) => {
-    const idx = db.exports.findIndex((e) => e.id === id);
+    const idx = db.exports.findIndex(
+      (e) => e.id === id && (ownerId === undefined || e.ownerId === ownerId),
+    );
     if (idx < 0) return false;
     const [rec] = db.exports.splice(idx, 1);
     await fs
@@ -236,9 +260,11 @@ export async function deleteExport(id: string) {
   });
 }
 
-export async function listVoiceProfiles() {
+export async function listVoiceProfiles(ownerId?: string) {
   const db = await readDb();
-  return [...db.voiceProfiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return db.voiceProfiles
+    .filter((profile) => (ownerId === undefined ? true : profile.ownerId === ownerId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function addVoiceProfile(profile: VoiceProfile) {
@@ -248,9 +274,11 @@ export async function addVoiceProfile(profile: VoiceProfile) {
   });
 }
 
-export async function deleteVoiceProfile(id: string) {
+export async function deleteVoiceProfile(id: string, ownerId?: string) {
   return mutateDb((db) => {
-    const idx = db.voiceProfiles.findIndex((p) => p.id === id);
+    const idx = db.voiceProfiles.findIndex(
+      (p) => p.id === id && (ownerId === undefined || p.ownerId === ownerId),
+    );
     if (idx < 0) return false;
     db.voiceProfiles.splice(idx, 1);
     return true;
@@ -269,13 +297,47 @@ export async function updateSettings(patch: Partial<Database["settings"]>) {
   });
 }
 
-export async function purgeAllData() {
+/**
+ * Wipe studio data.
+ *
+ * With an `ownerId` only that account's projects, exports, profiles and share
+ * links are removed (and the audio files they own). Without one — the owner's
+ * "delete everything" action on a single-operator install — the whole store is
+ * cleared. Accounts and settings are never touched here.
+ */
+export async function purgeAllData(ownerId?: string) {
   return mutateDb(async (db) => {
-    db.projects = [];
-    db.exports = [];
-    db.voiceProfiles = [];
-    await fs.rm(EXPORT_DIR, { recursive: true, force: true });
-    await fs.mkdir(EXPORT_DIR, { recursive: true });
+    if (ownerId === undefined) {
+      const assets = db.projects.flatMap((project) => project.assets);
+      await Promise.allSettled(assets.map((asset) => deleteAudio(asset.id, asset.extension)));
+      db.projects = [];
+      db.exports = [];
+      db.voiceProfiles = [];
+      db.shares = [];
+      await fs.rm(EXPORT_DIR, { recursive: true, force: true });
+      await fs.mkdir(EXPORT_DIR, { recursive: true });
+      return true;
+    }
+
+    const mine = db.projects.filter((project) => project.ownerId === ownerId);
+    await Promise.allSettled(
+      mine.flatMap((project) => project.assets.map((asset) => deleteAudio(asset.id, asset.extension))),
+    );
+    const exports = db.exports.filter((record) => record.ownerId === ownerId);
+    await Promise.allSettled(
+      exports.map((record) =>
+        fs.unlink(path.join(EXPORT_DIR, path.basename(record.storedName))).catch(() => {}),
+      ),
+    );
+    db.projects = db.projects.filter((project) => project.ownerId !== ownerId);
+    db.exports = db.exports.filter((record) => record.ownerId !== ownerId);
+    db.voiceProfiles = db.voiceProfiles.filter((profile) => profile.ownerId !== ownerId);
+    db.shares = db.shares.filter((share) => share.ownerId !== ownerId);
     return true;
   });
+}
+
+/** Delete everything belonging to one account (used by account deletion). */
+export async function deleteAccountData(userId: string) {
+  await purgeAllData(userId);
 }
