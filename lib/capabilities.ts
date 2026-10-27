@@ -26,6 +26,34 @@ export const STATUS_LABEL: Record<CapabilityStatus, string> = {
 
 export const CAPABILITIES: Capability[] = [
   {
+    name: "Accounts, sign-in and per-account libraries",
+    area: "Platform",
+    status: "ready",
+    detail:
+      "Scrypt password hashing, HttpOnly session cookies (the database stores only a hash), 30-day expiry, password change that revokes other sessions, and ownership checks on every project, asset, export and profile.",
+  },
+  {
+    name: "Share a project with friends by private link",
+    area: "Platform",
+    status: "ready",
+    detail:
+      "Read-only `/s/<token>` page exposing only mixer-channel audio, with optional download, expiry and passcode, instant revocation, and hashed tokens (the link is shown once).",
+  },
+  {
+    name: "Email verification, password-reset mail and email changes",
+    area: "Platform",
+    status: "planned",
+    detail:
+      "No mail service is configured, so none of these are offered rather than faked. Recovery is done by the person running the server.",
+  },
+  {
+    name: "Public artist pages, follows and a social feed",
+    area: "Platform",
+    status: "planned",
+    detail:
+      "Sharing is per-project, per-link and revocable. There is no public discovery, no follower graph and no comment system.",
+  },
+  {
     name: "Generation billing guards (paid off by default, hard spend cap)",
     area: "Platform",
     status: "ready",
@@ -75,11 +103,11 @@ export const CAPABILITIES: Capability[] = [
       "Gemini is used when GEMINI_API_KEY is set; otherwise a deterministic music-production rule engine runs and is labelled as such.",
   },
   {
-    name: "Multi-user accounts / cloud storage",
+    name: "Cloud storage / multi-server hosting",
     area: "Platform",
     status: "planned",
     detail:
-      "This build is a single-operator studio on private local disk. Add Supabase/Postgres auth and object storage for multi-tenant hosting.",
+      "Accounts are isolated logically but stored on one node (JSON index + files under .data). Supabase/Postgres with object storage is the path to running several servers; it is not implemented.",
   },
   {
     name: "Vocal layers: chorus, harmony, ad-lib, double, choir, backing",

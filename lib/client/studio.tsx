@@ -9,7 +9,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { api, assetAudioUrl, uploadAsset } from "@/lib/client/api";
+import { usePathname, useRouter } from "next/navigation";
+import { isPublicPath } from "@/lib/routes";
+import { ApiError, api, assetAudioUrl, uploadAsset, type AccountUser } from "@/lib/client/api";
 import { cacheBuffer, decodeFile, getAudioContext } from "@/lib/client/audio";
 import { encodeChannels } from "@/lib/audio/render";
 import { extractPeaks } from "@/lib/audio/peaks";
@@ -49,6 +51,12 @@ export interface PlayerState {
 type SystemInfo = Awaited<ReturnType<typeof api.system>>;
 
 interface StudioContextValue {
+  /** Signed-in account, or null on the sign-in screens. */
+  user: AccountUser | null;
+  /** True when the studio accepts new accounts. */
+  signupOpen: boolean;
+  /** Sign out and return to the login screen. */
+  signOut: () => Promise<void>;
   ready: boolean;
   loading: boolean;
   loadError: string | null;
@@ -132,6 +140,10 @@ const StudioContext = createContext<StudioContextValue | null>(null);
 const LS_KEY = "eldermi.currentProject";
 
 export function StudioProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<AccountUser | null>(null);
+  const [signupOpen, setSignupOpen] = useState(true);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -173,9 +185,22 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   /* ---------------------------------------------------------------- */
 
   const loadAll = useCallback(async () => {
+    // Public screens (sign in, sign up, a friend's shared link) have no studio
+    // data to load and must never trigger a redirect loop.
+    if (isPublicPath(pathname)) {
+      setReady(true);
+      return;
+    }
     setLoading(true);
     try {
-      const [p, e, sys] = await Promise.all([api.projects(), api.exports(), api.system()]);
+      const [p, e, sys, me] = await Promise.all([
+        api.projects(),
+        api.exports(),
+        api.system(),
+        api.me(),
+      ]);
+      setUser(sys.user ?? me.user);
+      setSignupOpen(me.signupOpen);
       setProjects(p.projects);
       setExportsList(e.exports);
       setSettings(sys.settings);
@@ -192,16 +217,32 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       }
       setLoadError(null);
     } catch (err) {
+      // An expired or forged session is not an app error: send the producer to
+      // the sign-in screen with a path back to where they were.
+      if (err instanceof ApiError && err.status === 401) {
+        const next = typeof window !== "undefined" ? window.location.pathname : "/";
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
+        return;
+      }
       setLoadError((err as Error).message);
     } finally {
       setLoading(false);
       setReady(true);
     }
-  }, []);
+  }, [pathname, router]);
 
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  const signOut = useCallback(async () => {
+    try {
+      await api.logout();
+    } finally {
+      setUser(null);
+      router.replace("/login");
+    }
+  }, [router]);
 
   const flushSave = useCallback(async () => {
     const target = pendingRef.current.project;
@@ -711,6 +752,9 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<StudioContextValue>(
     () => ({
+      user,
+      signupOpen,
+      signOut,
       ready,
       loading,
       loadError,
@@ -753,6 +797,9 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       saveExport,
     }),
     [
+      user,
+      signupOpen,
+      signOut,
       ready,
       loading,
       loadError,

@@ -1,3 +1,4 @@
+import { guard } from "@/lib/server/auth";
 import { getSettings, purgeAllData, updateSettings } from "@/lib/server/repo";
 import { storageUsage } from "@/lib/server/db";
 import { asNumber, asString, jsonError } from "@/lib/server/validation";
@@ -6,6 +7,8 @@ import type { StudioSettings } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   return Response.json({
     settings: await getSettings(),
     storage: await storageUsage(),
@@ -13,6 +16,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return jsonError("Invalid JSON body");
   const patch: Partial<StudioSettings> = {};
@@ -40,8 +45,13 @@ export async function PATCH(request: Request) {
   return Response.json({ settings });
 }
 
-/** Data deletion control: wipes projects, audio, exports and metadata. */
+/**
+ * Data deletion control: wipes the signed-in account's projects, audio,
+ * exports, voice profiles and share links. Other accounts are untouched.
+ */
 export async function DELETE() {
-  await purgeAllData();
+  const auth = await guard();
+  if (auth.response) return auth.response;
+  await purgeAllData(auth.user.id);
   return Response.json({ ok: true });
 }

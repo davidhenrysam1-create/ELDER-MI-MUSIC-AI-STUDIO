@@ -397,6 +397,44 @@ export default function DashboardPage() {
             </ul>
           )}
         </GlassCard>
+
+        <GlassCard accent="mix">
+          <SectionHeading
+            eyebrow="Share"
+            title="Send a friend a listening link"
+            action={
+              <Link href="/shares" className="text-[11px] font-semibold text-violet-200 hover:text-white">
+                All links →
+              </Link>
+            }
+          />
+          <p className="text-[11px] leading-relaxed text-muted">
+            A listening link opens one project, read-only, in any browser — no account, no app. You
+            choose whether downloads are allowed, whether it expires and whether a passcode is needed.
+          </p>
+          <ul className="mt-2 space-y-1 text-[10px] text-muted">
+            <li className="flex items-center gap-1.5">
+              <Icon name="lock" size={11} className="text-emerald-300" /> Only channel audio is exposed
+            </li>
+            <li className="flex items-center gap-1.5">
+              <Icon name="clock" size={11} className="text-cyan-300" /> Expiry and revocation work instantly
+            </li>
+            <li className="flex items-center gap-1.5">
+              <Icon name="user" size={11} className="text-violet-300" /> Links are tied to your account
+            </li>
+          </ul>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={project ? `/shares?project=${encodeURIComponent(project.id)}` : "/shares"}
+              className="btn-primary text-xs"
+            >
+              <Icon name="link" size={13} /> Share this project
+            </Link>
+            <Link href="/account" className="btn-subtle text-xs">
+              <Icon name="user" size={13} /> My account
+            </Link>
+          </div>
+        </GlassCard>
       </section>
 
       <section className="glass p-4">

@@ -1,3 +1,4 @@
+import { guard } from "@/lib/server/auth";
 import { storageUsage } from "@/lib/server/db";
 import { geminiConfigured, geminiModel } from "@/lib/server/promptEngine";
 import { listDescriptors, providerSummary } from "@/lib/server/providers/registry";
@@ -7,13 +8,18 @@ import { getSettings } from "@/lib/server/repo";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const [settings, usage, spend] = await Promise.all([
     getSettings(),
     storageUsage(),
     spendSummary(),
   ]);
   return Response.json({
-    version: "1.0.0",
+    version: "1.1.0",
+    // Identity of the signed-in account, so the shell can greet them and the
+    // account page can show who is logged in without a second request.
+    user: auth.user,
     settings,
     storage: usage,
     spend,

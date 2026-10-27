@@ -28,6 +28,11 @@ const ENV_VARS = [
     detail: "Optional defaults for upload limits (80 MB / 720 s). Editable in Settings.",
   },
   {
+    key: "ALLOW_SIGNUP",
+    detail:
+      "Optional, default true. Set to false to close new accounts on an exposed studio. The first account can still be created, and existing accounts keep working.",
+  },
+  {
     key: "VOICE_CONVERSION_API_URL",
     detail:
       "Reserved for a licensed voice-conversion adapter. When unset, voice transformation stays disabled.",
@@ -195,6 +200,91 @@ export default function DocsPage() {
           </ul>
         </GlassCard>
       </div>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-base font-semibold text-softwhite">Accounts &amp; sign-in</h2>
+          <StatusPill tone="success" icon="user">
+            Implemented
+          </StatusPill>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          Every page needs an account. The first account created becomes the studio owner and adopts any
+          project saved before accounts existed, so upgrading loses nothing.
+        </p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5">
+            <div className="text-[10px] font-semibold text-softwhite">How passwords are stored</div>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+              Salted scrypt hashes (<span className="mono">scrypt$N$r$p$salt$hash</span>) in the studio
+              database. Plaintext is never stored, logged or sent to the browser.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2.5">
+            <div className="text-[10px] font-semibold text-softwhite">How sessions work</div>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+              A random 256-bit token in an <span className="mono">HttpOnly</span>,{" "}
+              <span className="mono">SameSite=Lax</span> cookie, valid 30 days. The database stores only
+              its hash, and the account page lists each device.
+            </p>
+          </div>
+        </div>
+        <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-muted">
+          <li>
+            <span className="text-softwhite">Isolation:</span> projects, audio, exports, voice profiles
+            and links are filtered by owner on every request; another account&apos;s id returns 404.
+          </li>
+          <li>
+            <span className="text-softwhite">Password change</span> signs every device out. The owner
+            account cannot delete itself — that would orphan everyone else.
+          </li>
+          <li>
+            <span className="text-softwhite">No email is sent.</span> There is no verification or reset
+            mail in this build, so none is promised; a forgotten password is reset by whoever runs the
+            server.
+          </li>
+        </ul>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-base font-semibold text-softwhite">Sharing a project with friends</h2>
+          <StatusPill tone="success" icon="link">
+            Implemented
+          </StatusPill>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          <span className="mono">/shares</span> creates a read-only link for one project. A friend opens
+          it on any phone or laptop — no account, no install.
+        </p>
+        <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-muted">
+          <li>
+            <span className="text-softwhite">Only mixer audio is shared.</span> Stored files that were
+            never placed on a channel stay private, as do the mixer, mastering chain, versions and your
+            other projects.
+          </li>
+          <li>
+            <span className="text-softwhite">Per-link controls:</span> listen-only or allow downloads;
+            expiry at 24 hours / 7 / 30 / 90 days or never; optional 4–12 character passcode.
+          </li>
+          <li>
+            <span className="text-softwhite">Revocation is immediate</span> and enforced on every audio
+            request, not just the page. Expiry works the same way.
+          </li>
+          <li>
+            <span className="text-softwhite">Tokens are stored hashed</span>, so the link is shown once
+            when created. Lost it? Revoke and make a new one.
+          </li>
+          <li>
+            <span className="text-softwhite">Counters only:</span> opens, downloads and last opened. No IP
+            addresses or user agents.
+          </li>
+        </ul>
+        <p className="mt-2 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] p-2.5 text-[9px] leading-relaxed text-amber-100/85">
+          A link only works while this studio server is reachable. For friends outside your network, host
+          the studio (or run a tunnel) first. There is no public feed, follow or comment system.
+        </p>
+      </GlassCard>
 
       <GlassCard>
         <div className="flex flex-wrap items-start justify-between gap-2">

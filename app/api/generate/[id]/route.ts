@@ -7,6 +7,7 @@
  * Polling is explicit rather than server-push so the studio works on a plain
  * Node server with no queue infrastructure.
  */
+import { guard } from "@/lib/server/auth";
 import { advanceGeneration, cancelGeneration } from "@/lib/server/generation";
 import { ProviderError } from "@/lib/server/providers/types";
 import { jsonError } from "@/lib/server/validation";
@@ -17,9 +18,11 @@ export const maxDuration = 120;
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const { id } = await params;
   try {
-    const outcome = await advanceGeneration(id);
+    const outcome = await advanceGeneration(id, auth.user.id);
     if (!outcome) return jsonError("Generation job not found", 404);
     return Response.json(outcome);
   } catch (err) {
@@ -29,9 +32,11 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const { id } = await params;
   try {
-    const job = await cancelGeneration(id);
+    const job = await cancelGeneration(id, auth.user.id);
     if (!job) return jsonError("Generation job not found", 404);
     return Response.json({ job });
   } catch (err) {

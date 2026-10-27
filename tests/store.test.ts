@@ -60,7 +60,7 @@ describe("project persistence", () => {
   it("writes valid JSON to disk after each mutation", async () => {
     const raw = await readFile(path.join(tmpDir, "db.json"), "utf8");
     const parsed = JSON.parse(raw);
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     expect(Array.isArray(parsed.projects)).toBe(true);
   });
 
@@ -128,6 +128,7 @@ describe("project persistence", () => {
     await storage.writeExport("exp_test.wav", new Uint8Array([0, 1, 2, 3]));
     await repo.addExport({
       id: "exp_test",
+      ownerId: null,
       projectId: project.id,
       projectName: project.name,
       studio: "mastering",
@@ -198,6 +199,7 @@ describe("project persistence", () => {
   it("enforces consent for voice profiles at the API level input shape", async () => {
     const profile = {
       id: "vp_test",
+      ownerId: null,
       name: "Performer",
       timbreDescription: "warm",
       genreSuitability: "Afrobeats",

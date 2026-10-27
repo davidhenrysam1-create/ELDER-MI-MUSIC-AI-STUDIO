@@ -7,6 +7,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { GradientText, StatusPill, Toasts, cn, Modal, ProgressBar } from "@/components/ui/primitives";
 import { GlobalPlayer } from "@/components/audio/GlobalPlayer";
 import { useStudio } from "@/lib/client/studio";
+import { isPublicPath } from "@/lib/routes";
 import { formatBytes, relativeTime } from "@/lib/format";
 import { NewProjectButton } from "@/components/shell/NewProjectDialog";
 
@@ -18,6 +19,8 @@ const NAV: { href: string; label: string; icon: IconName; studio?: "vocal" | "mi
   { href: "/projects", label: "My Projects", icon: "folder" },
   { href: "/voice-profiles", label: "My Voice Profiles", icon: "voice" },
   { href: "/exports", label: "Export History", icon: "download" },
+  { href: "/shares", label: "Share with friends", icon: "link" },
+  { href: "/account", label: "My account", icon: "user" },
   { href: "/settings", label: "Settings", icon: "settings" },
   { href: "/docs", label: "Documentation", icon: "file" },
   { href: "/help", label: "Help & DAW import", icon: "info" },
@@ -115,11 +118,17 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 export function StudioShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const { settings, system, notify } = useStudio();
+  const { settings, system, notify, user, signOut } = useStudio();
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  // Sign-in, sign-up and a friend's shared link are their own screens: no
+  // studio navigation, no project switcher, no player chrome.
+  if (isPublicPath(pathname)) {
+    return <div className="min-h-dvh">{children}</div>;
+  }
 
   const storageUsed = (system?.storage.audioBytes ?? 0) + (system?.storage.exportBytes ?? 0);
   const storageCap = 2 * 1024 * 1024 * 1024;
@@ -143,7 +152,35 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
           <div className="label mb-2 px-1">Workspaces</div>
           <NavLinks />
         </div>
-        <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-black/25 p-3">
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-3">
+          <div className="flex items-center gap-2">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-violet/60 to-cyan/50 text-[11px] font-bold text-white">
+              {(user?.name ?? "?").slice(0, 1).toUpperCase()}
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-[11px] font-semibold text-softwhite">
+                {user?.name ?? "Not signed in"}
+              </div>
+              <div className="truncate text-[9px] text-muted">{user?.email ?? ""}</div>
+            </div>
+          </div>
+          <div className="mt-2 flex gap-1.5">
+            <Link
+              href="/account"
+              className="flex-1 rounded-lg border border-white/10 py-1 text-center text-[10px] text-muted transition-colors hover:text-softwhite"
+            >
+              Account
+            </Link>
+            <button
+              type="button"
+              onClick={() => void signOut?.()}
+              className="flex-1 rounded-lg border border-white/10 py-1 text-[10px] text-muted transition-colors hover:text-rose-200"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+        <div className="mt-3 space-y-3 rounded-xl border border-white/10 bg-black/25 p-3">
           <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted">
             <span>Local studio storage</span>
             <span className="mono text-softwhite/80">{formatBytes(storageUsed)}</span>

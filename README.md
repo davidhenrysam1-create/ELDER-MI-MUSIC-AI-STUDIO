@@ -195,6 +195,53 @@ How to try it safely:
 
 ---
 
+## 5c. Accounts, sign-in and sharing
+
+The studio is now **multi-account on your own server**. Each account sees only its own projects,
+audio, exports, voice profiles and share links.
+
+### Signing in
+
+| Screen | What it does |
+| --- | --- |
+| `/signup` | Name, email, password (8+ chars). The **first** account becomes the studio owner and adopts anything saved before accounts existed, so upgrading loses nothing. |
+| `/login` | Email + password, with "show password" and a return path (`?next=`). |
+| `/account` | Change display name, change password (signs every device out), see active sessions, close the account. |
+
+How it is stored: passwords are salted **scrypt** hashes (`scrypt$N$r$p$salt$hash`) in `db.json`;
+never plaintext, never sent to the browser. Sessions are a random 256-bit token in an `HttpOnly`,
+`SameSite=Lax` cookie; the database keeps only its SHA-256, so a copy of the database cannot be
+replayed as a login. Sessions last 30 days and are listed by device type — no IP addresses are stored.
+
+Honest gaps, stated in the UI too: **no verification or reset email** (this build has no mail service,
+so it does not pretend to send one), and **no email change** yet. A forgotten password is reset by the
+person running the server. `ALLOW_SIGNUP=false` closes new accounts; the first account can still be
+created, and existing accounts keep working.
+
+### Sharing with friends
+
+`/shares` (or **Share this project** on the dashboard) creates a **read-only listening link** for one
+project:
+
+- **No account needed** — `/s/<token>` opens a clean page with project name, your display name,
+  genre, tempo, key, a player for every channel on the mixer, and an optional download button.
+- **Only channel audio is exposed.** Files stored in the project but not placed on the mixer are never
+  served, and mixer settings, mastering chain, versions and other projects are not visible.
+- **You decide the terms** per link: listen-only or allow downloads; expires in 24 hours / 7 / 30 / 90
+  days or never; optional 4–12 character passcode (stored as a scrypt hash and remembered per browser).
+- **Revoke instantly.** Revoking or expiry is enforced on the server for every audio request, not just
+  the page.
+- **Tokens are hashed at rest**, so the full link is shown **once**, at creation. Lost it? Revoke and
+  create another — the UI says this plainly instead of implying it can be recovered.
+- **Minimal counters**: opens and downloads per link, plus last opened. No IP addresses, user agents or
+  tracking pixels.
+
+Limits worth knowing: a link only works while this studio server is reachable, so friends outside your
+network need the app hosted or tunnelled first. Sharing is per project, not per file; export history
+still holds finished files, and the owner can hand them over directly.
+
+---
+
 ## 6. Configuration
 
 Copy `.env.example` to `.env.local`:
@@ -212,7 +259,8 @@ Copy `.env.example` to `.env.local`:
 | `REPLICATE_API_TOKEN` | Optional. Enables MusicGen on Replicate (async, polled). |
 | `SPEND_CAP_USD` | Optional, default `5`. Hard ceiling on tracked generation spend. |
 | `*_USD_PER_SEC` | Optional cost overrides: `LYRIA_`, `STABLE_AUDIO_`, `ELEVENLABS_`, `REPLICATE_MUSICGEN_`. |
-| `STUDIO_PASSWORD`, `STUDIO_USER` | Optional HTTP Basic auth for the whole studio. |
+| `STUDIO_PASSWORD`, `STUDIO_USER` | Optional HTTP Basic auth in front of the whole studio (an extra door before accounts). |
+| `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close new accounts; the first account can still be created. |
 
 Secrets never reach the browser: API routes read them and return only results.
 
@@ -231,8 +279,11 @@ app/                     Next.js App Router pages + API route handlers
 components/              Shell, audio widgets (waveform, player, upload), studio panels
 lib/
   audio/                 DSP: analysis, pitch, render, WAV/MP3, peaks, arrangement
+  routes.ts              public-route rules shared by the shell and the provider
   client/                Studio provider, API client, audio cache, mixdown, ZIP, export
   server/                JSON store, repository, storage, prompt engine, validation
+    auth.ts              accounts, scrypt hashing, sessions, ownership guard
+    shares.ts            read-only share links (hashed tokens, expiry, passcode)
     providers/           one adapter per music-generation vendor + registry
     generation.ts        job orchestration, budget gates, provenance, spend ledger
   types.ts, projects.ts  Domain model and defaults
@@ -264,10 +315,15 @@ tests/                   Vitest suites (DSP, prompt engine, persistence, migrati
   chose, and the rendered file is downloaded into private storage. Nothing is uploaded to a provider
   unless you press *Generate audio* with paid generation enabled.
 
-This build is a **single-operator studio**. Auth is optional and off by default so local use needs no
-setup: set `STUDIO_PASSWORD` (and optionally `STUDIO_USER`, default `studio`) to require HTTP Basic
-credentials for every page and API route through `middleware.ts`. For a public deployment also put the
-app behind a reverse proxy or platform auth, and add multi-user accounts by extending the repository
+Every page and API route requires a signed-in account. `middleware.ts` only checks that a session
+cookie exists (the edge runtime cannot read the JSON store); each request then validates the session,
+expiry and ownership in `lib/server/auth.ts` before touching data, so a forged cookie gets a `401`. The
+optional `STUDIO_PASSWORD` Basic-auth gate still sits in front of everything as a second door.
+
+For a public deployment also put the app behind HTTPS (the session cookie is marked `Secure` in
+production), keep `ALLOW_SIGNUP=false` if it is just you, and back up `.data/`. The storage layer is
+still single-node JSON + files; swapping `lib/server/db.ts` for Postgres is the path to horizontal
+scaling, and multi-tenancy beyond one server would need
 layer.
 
 ---

@@ -363,6 +363,12 @@ export interface ProjectVersion {
 
 export interface Project {
   id: string;
+  /**
+   * Account that owns this project. `null` only for data created before
+   * accounts existed; the first account created claims it (see
+   * `lib/server/auth.ts → claimOrphanData`).
+   */
+  ownerId: string | null;
   name: string;
   genre: Genre;
   bpm: number;
@@ -381,6 +387,8 @@ export interface Project {
 
 export interface ExportRecord {
   id: string;
+  /** Account that owns this export (mirrors the project owner). */
+  ownerId: string | null;
   projectId: string;
   projectName: string;
   studio: StudioId;
@@ -400,6 +408,8 @@ export interface ExportRecord {
 
 export interface VoiceProfile {
   id: string;
+  /** Account that created this profile; profiles are never shared. */
+  ownerId: string | null;
   name: string;
   timbreDescription: string;
   genreSuitability: string;
@@ -425,8 +435,93 @@ export interface StudioSettings {
   maxDurationSec: number;
 }
 
+/**
+ * A studio account.
+ *
+ * Accounts are local to this server: no third-party identity provider, no email
+ * delivery. Passwords are stored only as salted scrypt hashes.
+ */
+export interface User {
+  id: string;
+  /** Normalised (lower-cased) address, unique across the studio. */
+  email: string;
+  name: string;
+  /** scrypt hash in the form `scrypt$N$r$p$salt$hash`; never leaves the server. */
+  passwordHash: string;
+  /** `owner` is the first account: it may promote the studio and claim old data. */
+  role: "owner" | "member";
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+/** A server-side session record. The cookie holds the token, never this id. */
+export interface SessionRecord {
+  /** SHA-256 of the session token, so a database leak cannot be replayed. */
+  id: string;
+  userId: string;
+  createdAt: string;
+  expiresAt: string;
+  /** Free text for the account page ("Chrome on Android"), no IP stored. */
+  device: string;
+}
+
+/**
+ * A read-only share link for a whole project.
+ *
+ * Only a hash of the token is stored, so a leaked database cannot be used to
+ * guess a working link.
+ */
+export interface ShareLink {
+  id: string;
+  /** SHA-256 of the token that appears in the URL. */
+  tokenHash: string;
+  projectId: string;
+  ownerId: string;
+  /** Optional friendly label, e.g. "Ada's listening link". */
+  label: string;
+  allowDownload: boolean;
+  /** scrypt hash of the 4–12 character passcode, when one is set. */
+  passcodeHash: string | null;
+  /** ISO timestamp, or null for "no expiry". */
+  expiresAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+  opens: number;
+  downloads: number;
+  lastOpenedAt: string | null;
+}
+
+/** What an anonymous visitor may see about a shared project. */
+export interface SharedProjectView {
+  projectId: string;
+  name: string;
+  ownerName: string;
+  genre: string;
+  bpm: number;
+  musicalKey: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  label: string;
+  allowDownload: boolean;
+  expiresAt: string | null;
+  requiresPasscode: boolean;
+  tracks: {
+    id: string;
+    name: string;
+    role: string;
+    assetId: string;
+    mimeType: string;
+    durationSec: number;
+    sizeBytes: number;
+  }[];
+}
+
 export interface Database {
   version: number;
+  users: User[];
+  sessions: SessionRecord[];
+  shares: ShareLink[];
   projects: Project[];
   exports: ExportRecord[];
   voiceProfiles: VoiceProfile[];

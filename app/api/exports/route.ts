@@ -1,3 +1,4 @@
+import { guard } from "@/lib/server/auth";
 import { addExport, getProject, listExports } from "@/lib/server/repo";
 import { sanitizeFileName, writeExport } from "@/lib/server/storage";
 import { asNumber, asString, jsonError } from "@/lib/server/validation";
@@ -7,11 +8,15 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function GET() {
-  return Response.json({ exports: await listExports() });
+  const auth = await guard();
+  if (auth.response) return auth.response;
+  return Response.json({ exports: await listExports(auth.user.id) });
 }
 
 /** Store a rendered export so it stays downloadable from Export History. */
 export async function POST(request: Request) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const form = await request.formData().catch(() => null);
   if (!form) return jsonError("Expected multipart/form-data");
   const file = form.get("file");
@@ -27,7 +32,7 @@ export async function POST(request: Request) {
   }
 
   const projectId = asString(meta.projectId, "", 60);
-  const project = await getProject(projectId);
+  const project = await getProject(projectId, auth.user.id);
   if (!project) return jsonError("Project not found", 404);
 
   const format = asString(meta.format, "WAV", 8).toUpperCase() === "MP3" ? "MP3" : "WAV";
@@ -47,6 +52,7 @@ export async function POST(request: Request) {
 
   const record: ExportRecord = {
     id,
+    ownerId: auth.user.id,
     projectId,
     projectName: project.name,
     studio,

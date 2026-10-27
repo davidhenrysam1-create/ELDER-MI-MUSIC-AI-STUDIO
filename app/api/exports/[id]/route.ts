@@ -1,3 +1,4 @@
+import { guard } from "@/lib/server/auth";
 import { readExport } from "@/lib/server/storage";
 import { deleteExport, listExports } from "@/lib/server/repo";
 import { jsonError } from "@/lib/server/validation";
@@ -7,8 +8,10 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const { id } = await params;
-  const record = (await listExports()).find((e) => e.id === id);
+  const record = (await listExports(auth.user.id)).find((e) => e.id === id);
   if (!record) return jsonError("Export not found", 404);
   try {
     const { data } = await readExport(record.storedName);
@@ -27,8 +30,10 @@ export async function GET(_req: Request, { params }: Params) {
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
+  const auth = await guard();
+  if (auth.response) return auth.response;
   const { id } = await params;
-  const ok = await deleteExport(id);
+  const ok = await deleteExport(id, auth.user.id);
   if (!ok) return jsonError("Export not found", 404);
   return Response.json({ ok: true });
 }
