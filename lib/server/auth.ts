@@ -210,6 +210,8 @@ export function normalizeUser(user: User): User {
     emailVerified: user.emailVerified === true,
     verifyTokenHash: user.verifyTokenHash ?? null,
     verifyExpiresAt: user.verifyExpiresAt ?? null,
+    resetTokenHash: user.resetTokenHash ?? null,
+    resetExpiresAt: user.resetExpiresAt ?? null,
     provider: user.provider ?? "password",
     googleSub: user.googleSub ?? null,
     suspendedAt: user.suspendedAt ?? null,
@@ -1299,6 +1301,94 @@ export async function confirmEmail(token: string): Promise<PublicUser> {
     record.emailVerified = true;
     record.verifyTokenHash = null;
     record.verifyExpiresAt = null;
+    return record;
+  });
+  return toPublic(updated);
+}
+
+/* ------------------------------------------------------------------ */
+/* Password reset                                                      */
+/* ------------------------------------------------------------------ */
+
+/** How long a reset link stays usable. Short on purpose. */
+export const RESET_MINUTES = 60;
+
+/** Why a reset request could not produce a link (never shown to strangers). */
+export type ResetRefusal = "unknown" | "suspended" | "no-password";
+
+/**
+ * Start a password reset.
+ *
+ * The caller answers with the same sentence whether or not the address exists,
+ * so this endpoint cannot be used to discover who has an account. A token is
+ * only minted for a real account that has a password and is not suspended.
+ */
+export async function issuePasswordReset(email: string): Promise<
+  | { issued: true; token: string; expiresAt: string; name: string; email: string }
+  | { issued: false; reason: ResetRefusal }
+> {
+  const normalized = normalizeEmail(email ?? "");
+  if (!normalized) return { issued: false, reason: "unknown" };
+
+  const db = await readDb();
+  const user = db.users.find((entry) => entry.email === normalized);
+  if (!user) return { issued: false, reason: "unknown" };
+  if (user.suspendedAt) return { issued: false, reason: "suspended" };
+  // A Google-only account has no password to reset — it signs in with Google.
+  if (!user.passwordHash) return { issued: false, reason: "no-password" };
+
+  const token = randomBytes(24).toString("base64url");
+  const expiresAt = new Date(Date.now() + RESET_MINUTES * 60 * 1000).toISOString();
+  await mutateDb((state) => {
+    const record = state.users.find((entry) => entry.id === user.id);
+    if (!record) return;
+    record.resetTokenHash = sha256(token);
+    record.resetExpiresAt = expiresAt;
+  });
+  return { issued: true, token, expiresAt, name: user.name, email: user.email };
+}
+
+/**
+ * Finish a reset with the token from the link.
+ *
+ * The token is burned on success, the setup-password flag is cleared, and every
+ * session for the account ends — a reset is also the way to evict someone who
+ * had the old password.
+ */
+export async function resetPasswordWithToken(
+  token: string,
+  newPassword: string,
+): Promise<PublicUser> {
+  const raw = (token ?? "").trim();
+  if (!raw) throw new AuthError("That reset link is not valid.", 400);
+  const password = newPassword ?? "";
+  if (password.length < PASSWORD_MIN) {
+    throw new AuthError(`Use at least ${PASSWORD_MIN} characters for the new password.`, 400);
+  }
+  if (password.length > PASSWORD_MAX) {
+    throw new AuthError(`Use at most ${PASSWORD_MAX} characters.`, 400);
+  }
+
+  const db = await readDb();
+  const user = db.users.find((entry) => entry.resetTokenHash === sha256(raw));
+  if (!user) throw new AuthError("That reset link is not valid. Ask for a new one.", 400);
+  if (user.resetExpiresAt && new Date(user.resetExpiresAt) <= new Date()) {
+    throw new AuthError("That reset link expired. Ask for a new one.", 400);
+  }
+  if (user.suspendedAt) {
+    throw new AuthError("This account is suspended. Contact the studio admin.", 403);
+  }
+
+  const passwordHash = await hashPassword(password);
+  const updated = await mutateDb((state) => {
+    const record = state.users.find((entry) => entry.id === user.id)!;
+    record.passwordHash = passwordHash;
+    // A password the person chose themselves is no longer a setup password.
+    record.passwordSeeded = false;
+    record.resetTokenHash = null;
+    record.resetExpiresAt = null;
+    // Every device signs out; the new password is required from now on.
+    state.sessions = state.sessions.filter((session) => session.userId !== record.id);
     return record;
   });
   return toPublic(updated);

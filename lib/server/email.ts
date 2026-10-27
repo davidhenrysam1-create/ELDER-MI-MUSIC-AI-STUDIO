@@ -99,6 +99,25 @@ export function verificationEmail(name: string, link: string): { subject: string
   return { subject, html, text };
 }
 
+/** The password-reset message. Same shape as the verification mail. */
+export function passwordResetEmail(name: string, link: string, minutes = 60): { subject: string; html: string; text: string } {
+  const subject = "Reset your Elder Mi Music AI Studio password";
+  const text =
+    `Hi ${name},\n\n` +
+    `Someone asked to reset the password on your Elder Mi Music AI Studio account.\n${link}\n\n` +
+    `The link works once and expires in ${minutes} minutes. If this was not you, ignore this message — ` +
+    "your password has not changed.\n" +
+    "Your Sound. Your Culture. Your Studio.";
+  const html =
+    `<p>Hi ${escapeHtml(name)},</p>` +
+    `<p>Someone asked to reset the password on your <strong>Elder Mi Music AI Studio</strong> account.</p>` +
+    `<p><a href="${escapeHtml(link)}">Choose a new password</a></p>` +
+    `<p>The link works once and expires in ${minutes} minutes. If this was not you, ignore this message — ` +
+    "your password has not changed.</p>" +
+    `<p style="color:#888">Your Sound. Your Culture. Your Studio.</p>`;
+  return { subject, html, text };
+}
+
 /** Minimal HTML escaping for values interpolated into the mail body. */
 function escapeHtml(value: string): string {
   return value

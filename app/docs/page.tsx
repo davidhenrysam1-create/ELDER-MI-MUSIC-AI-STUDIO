@@ -351,6 +351,28 @@ export default function DocsPage() {
 
       <GlassCard>
         <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-base font-semibold text-softwhite">Password reset by email</h2>
+          <StatusPill tone="warning" icon="lock">
+            Awaiting configuration
+          </StatusPill>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          <span className="mono">/forgot</span> mints a single-use token (only its SHA-256 is stored,
+          valid for one hour) and emails the link through Resend;{" "}
+          <span className="mono">/reset</span> sets the new password, clears the setup-password flag and
+          ends every session for that account. The form answers the same way whether or not an address
+          has an account, so it cannot be used to discover who is registered.
+        </p>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+          Nothing is mailed until <span className="mono">RESEND_API_KEY</span> and{" "}
+          <span className="mono">EMAIL_FROM</span> are set — until then the screen says{" "}
+          <span className="text-softwhite">no email was sent</span> and points to whoever runs the
+          server. Changing a password while signed in (My account) needs no email at all.
+        </p>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <h2 className="text-base font-semibold text-softwhite">Open studio mode</h2>
           <StatusPill tone="success" icon="lock">
             Implemented

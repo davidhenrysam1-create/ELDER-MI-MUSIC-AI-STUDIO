@@ -8,6 +8,7 @@
 /**
  * Screens that work without an account:
  *  - `/login`, `/signup`     — the way in;
+ *  - `/forgot`, `/reset`     — forgotten-password recovery by email;
  *  - `/admin-bootstrap`      — the one-time admin code, needed *before* a session;
  *  - `/s/<token>`            — a friend's shared listening page;
  *  - `/u/<handle>`           — a public profile and its published music;
@@ -17,7 +18,14 @@
  * `/welcome` and `/admin` are **not** here: they need a session, so the shell's
  * auth guard must run for them.
  */
-export const PUBLIC_PATHS = ["/login", "/signup", "/admin-bootstrap", "/offline"] as const;
+export const PUBLIC_PATHS = [
+  "/login",
+  "/signup",
+  "/forgot",
+  "/reset",
+  "/admin-bootstrap",
+  "/offline",
+] as const;
 export const PUBLIC_PREFIXES = ["/s/", "/u/"] as const;
 
 export function isPublicPath(pathname: string | null | undefined): boolean {

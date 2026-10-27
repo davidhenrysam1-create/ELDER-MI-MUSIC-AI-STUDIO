@@ -235,6 +235,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  /** Start a password reset. Always answers generically (no account leak). */
+  forgotPassword: (email: string) =>
+    jsonFetch<{
+      ok: true;
+      sent: boolean;
+      emailConfigured: boolean;
+      message: string;
+      reason?: string;
+      hint?: string;
+      expiresAt?: string;
+    }>("/api/auth/password/forgot", { method: "POST", body: JSON.stringify({ email }) }),
+  /** Finish a reset with the token from the email plus the new password. */
+  resetPassword: (body: { token: string; password: string }) =>
+    jsonFetch<{ ok: true; email: string; signedOut: boolean }>("/api/auth/password/reset", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   sendVerification: () =>
     jsonFetch<{ sent: boolean; reason?: string; hint?: string; expiresAt?: string }>(
       "/api/auth/verify/send",
