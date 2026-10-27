@@ -8,13 +8,20 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { AuthError, signInWithGoogle } from "@/lib/server/auth";
-import { OAUTH_STATE_COOKIE, exchangeCodeForProfile, googleConfigured } from "@/lib/server/google";
+import { persistentCookieOptions } from "@/lib/server/cookies";
+import {
+  OAUTH_STATE_COOKIE,
+  exchangeCodeForProfile,
+  googleConfigured,
+  requestOrigin,
+} from "@/lib/server/google";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const origin = url.origin;
+  // Must match exactly what `/start` asked Google for, hence the same helper.
+  const origin = requestOrigin(request);
   const fail = (code: string) => NextResponse.redirect(new URL(`/login?google=${code}`, origin));
 
   if (!googleConfigured()) return fail("unconfigured");
@@ -24,7 +31,11 @@ export async function GET(request: Request) {
   const state = url.searchParams.get("state");
   const store = await cookies();
   const expected = store.get(OAUTH_STATE_COOKIE)?.value;
-  store.delete(OAUTH_STATE_COOKIE);
+  store.set(OAUTH_STATE_COOKIE, "", {
+    ...(await persistentCookieOptions(new Date(0))),
+    httpOnly: true,
+    maxAge: 0,
+  });
 
   if (!code || !state || !expected || state !== expected) return fail("state");
 

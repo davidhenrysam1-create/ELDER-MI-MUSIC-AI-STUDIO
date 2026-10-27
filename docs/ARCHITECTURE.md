@@ -250,6 +250,15 @@ scrypt hash exactly once: `seedAdminPassword()` runs on every admin sign-in atte
 authoritative — `changePassword()` replaces it and clears `passwordSeeded`, which is what drives the
 "still using the setup password" banner in `/admin`. The value never appears in the repository.
 
+**Cookie attributes** are decided in `lib/server/cookies.ts`, not by `NODE_ENV`. On plain HTTP the session
+cookie is `SameSite=Lax; HttpOnly` — the strict, familiar default. Over HTTPS (which includes any embedded
+preview, where the proxy terminates TLS and sends `x-forwarded-proto: https`, or a POST that carries an
+`https` `Origin`) it becomes `SameSite=None; Secure; Partitioned`, because a studio rendered inside another
+site's `<iframe>` is a third-party context and a `Lax` cookie is discarded there — the failure mode is a
+silent sign-in loop, not an error. `SameSite=None` is paired with `middleware.ts#crossSiteWrite`, which
+refuses state-changing requests whose `Origin` host does not match the served host. Clearing a cookie
+repeats the same attributes (an expired value, not a bare delete), otherwise the browser keeps the old one.
+
 **Bootstrap code** exists only so the owner can reach `/admin` before Google is configured: a random code
 (or `ADMIN_BOOTSTRAP_CODE`), hashed with SHA-256, single use, 24-hour expiry, printed to the server log and
 never emailed. It is refused outright once Google is configured. No admin password is stored anywhere.
@@ -298,7 +307,7 @@ into a release response, and `/u/<handle>` never includes an email address.
 | Route | Methods | Notes |
 | --- | --- | --- |
 | `/api/auth/me` | GET, PATCH | session view; PATCH name/handle/bio/links/roles |
-| `/api/auth/google/start`, `/api/auth/google/callback` | GET | Google OAuth; `start` redirects with an honest error when unconfigured |
+| `/api/auth/google/start`, `/api/auth/google/callback` | GET | Google OAuth; `start` redirects with an honest error when unconfigured. The `state` cookie shares the session cookie's attributes, or the callback inside a frame would fail with "attempt expired" |
 | `/api/auth/bootstrap` | POST | one-time admin code |
 | `/api/auth/onboarding` | POST | save roles (and handle) from `/welcome` |
 | `/api/auth/verify/send`, `/api/auth/verify/confirm` | POST, GET | issue a token / confirm the link |
