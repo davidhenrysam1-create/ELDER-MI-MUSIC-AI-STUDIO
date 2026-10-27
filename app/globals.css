@@ -1,0 +1,407 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --midnight: #090914;
+  --indigo: #15112b;
+  --violet: #8b5cf6;
+  --neon: #a855f7;
+  --cyan: #22d3ee;
+  --magenta: #ec4899;
+  --orange: #fb923c;
+  --gold: #facc15;
+  --muted: #a1a1b5;
+  color-scheme: dark;
+}
+
+* {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-midnight text-softwhite antialiased;
+  background-image:
+    radial-gradient(60rem 40rem at 12% -10%, rgba(139, 92, 246, 0.22), transparent 60%),
+    radial-gradient(50rem 36rem at 92% 0%, rgba(34, 211, 238, 0.14), transparent 55%),
+    radial-gradient(46rem 34rem at 78% 88%, rgba(236, 72, 153, 0.14), transparent 60%),
+    radial-gradient(40rem 30rem at 18% 100%, rgba(251, 146, 60, 0.08), transparent 60%);
+  background-attachment: fixed;
+  min-height: 100%;
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.4);
+  color: #fff;
+}
+
+/* --------------------------------------------------------------- */
+/* Glass surfaces                                                   */
+/* --------------------------------------------------------------- */
+
+@layer components {
+  .glass {
+    @apply relative rounded-2xl border border-white/10 bg-white/[0.035] backdrop-blur-xl;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 20px 50px -30px rgba(0, 0, 0, 0.9);
+  }
+
+  .glass-strong {
+    @apply relative rounded-2xl border border-white/10 bg-[#15112B]/80 backdrop-blur-2xl;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 24px 70px -34px rgba(0, 0, 0, 0.95);
+  }
+
+  .glass-panel {
+    @apply rounded-xl border border-white/10 bg-[#0d0b1c]/70 backdrop-blur-lg;
+  }
+
+  .glow-border {
+    position: relative;
+  }
+  .glow-border::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(120deg, rgba(168, 85, 247, 0.7), rgba(34, 211, 238, 0.5), rgba(236, 72, 153, 0.55));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+  }
+  .glow-border:hover::before,
+  .glow-border:focus-visible::before {
+    opacity: 1;
+  }
+
+  .gradient-text {
+    background-image: linear-gradient(100deg, #a855f7 0%, #ec4899 38%, #22d3ee 78%, #facc15 120%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .gradient-text-vocal {
+    background-image: linear-gradient(100deg, #a855f7, #ec4899 55%, #67e8f9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .gradient-text-mix {
+    background-image: linear-gradient(100deg, #22d3ee, #38bdf8 45%, #a855f7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .gradient-text-master {
+    background-image: linear-gradient(100deg, #fb923c, #facc15 45%, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply btn text-white;
+    background-image: linear-gradient(110deg, #7c3aed, #a855f7 45%, #ec4899);
+    box-shadow: 0 10px 30px -12px rgba(168, 85, 247, 0.8);
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 14px 40px -12px rgba(236, 72, 153, 0.7);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    @apply btn border border-white/10 bg-white/[0.04] text-softwhite hover:border-white/25 hover:bg-white/[0.08];
+  }
+
+  .btn-subtle {
+    @apply btn bg-white/[0.06] text-softwhite/90 hover:bg-white/[0.12];
+  }
+
+  .btn-danger {
+    @apply btn border border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-medium text-muted;
+  }
+
+  .label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted/80;
+  }
+
+  .mono {
+    @apply font-mono tabular-nums;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-softwhite placeholder:text-muted/50 focus:border-violet/60 focus:outline-none focus:ring-1 focus:ring-violet/40;
+  }
+
+  .panel-title {
+    @apply text-sm font-semibold uppercase tracking-[0.16em] text-muted;
+  }
+}
+
+/* --------------------------------------------------------------- */
+/* Range inputs                                                     */
+/* --------------------------------------------------------------- */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5.5px;
+  height: 16px;
+  width: 16px;
+  border-radius: 999px;
+  background: linear-gradient(140deg, #f8fafc, #a855f7);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.75);
+  transition: transform 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+input[type="range"]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 999px;
+  background: linear-gradient(140deg, #f8fafc, #a855f7);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.75);
+}
+
+input[type="range"].accent-cyan::-webkit-slider-thumb {
+  background: linear-gradient(140deg, #f8fafc, #22d3ee);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.75);
+}
+input[type="range"].accent-gold::-webkit-slider-thumb {
+  background: linear-gradient(140deg, #f8fafc, #facc15);
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.7);
+}
+input[type="range"].accent-orange::-webkit-slider-thumb {
+  background: linear-gradient(140deg, #f8fafc, #fb923c);
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.7);
+}
+
+/* --------------------------------------------------------------- */
+/* Scrollbars & misc                                                */
+/* --------------------------------------------------------------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.28);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.5);
+  background-clip: content-box;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.ambient-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 78%);
+}
+
+.waveform-mask {
+  mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
+}
+
+
+/* --------------------------------------------------------------- */
+/* Device adaptation (phone / tablet / laptop / desktop)            */
+/* --------------------------------------------------------------- */
+
+html {
+  /* iPhone/iPad: stop Safari from inflating text in landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Smooth anchor + programmatic scrolling without hijacking the page. */
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Dynamic viewport units keep the layout correct behind mobile toolbars. */
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+/* Notch and gesture-bar aware padding for fixed chrome. */
+.safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+.safe-top {
+  padding-top: max(0px, env(safe-area-inset-top));
+}
+.safe-x {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* Horizontal swipe area for the mixer and wide tables. */
+.scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+.scroll-x > * {
+  scroll-snap-align: start;
+}
+
+/* Fluid display sizes: readable at 320px, bold on a 4K monitor. */
+.text-fluid-hero {
+  font-size: clamp(1.55rem, 1.1rem + 2.4vw, 2.75rem);
+  line-height: 1.08;
+}
+.text-fluid-title {
+  font-size: clamp(1.25rem, 1.05rem + 1vw, 1.75rem);
+  line-height: 1.15;
+}
+
+/* iOS zooms the page when a focused field is under 16px: keep fields at 16px
+   on touch-sized screens instead of shrinking them. */
+@media (max-width: 640px) {
+  .field,
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  /* Comfortable tap targets on phones. */
+  .btn {
+    min-height: 40px;
+  }
+}
+
+/* Touch devices get larger slider thumbs and a taller hit area. */
+@media (pointer: coarse) {
+  input[type="range"] {
+    height: 34px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    height: 22px;
+    width: 22px;
+    margin-top: -8.5px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    height: 22px;
+    width: 22px;
+  }
+  /* Icon-only controls must stay tappable (44px minimum target). */
+  button[aria-label] {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* Very wide monitors: keep line lengths readable by widening the shell, not
+   the paragraphs. */
+@media (min-width: 1800px) {
+  .studio-shell {
+    max-width: 1680px;
+  }
+}
+
+/* Landscape phones are short: compact the fixed player so it does not cover
+   the console. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .player-shell {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+  .player-meta {
+    display: none;
+  }
+}
+
+/* Print (e.g. a mastering technical report) — keep it legible on paper. */
+@media print {
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .glass,
+  .glass-strong,
+  .glass-panel {
+    border: 1px solid #ddd !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
