@@ -66,6 +66,22 @@ export function relativeTime(iso: string) {
   return formatDate(iso);
 }
 
+/**
+ * Compact count for published-song stats: 999 → "999", 1234 → "1.2k".
+ *
+ * Purely a formatter: it never rounds a real zero up, so an unplayed song shows
+ * "0" rather than a friendly lie.
+ */
+export function formatCount(value: number): string {
+  const n = Math.max(0, Math.round(value));
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) {
+    const thousands = n / 1000;
+    return `${thousands.toFixed(thousands < 10 ? 1 : 0).replace(/\.0$/, "")}k`;
+  }
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+}
+
 export function titleCase(value: string) {
   return value
     .replace(/[_-]+/g, " ")

@@ -14,6 +14,20 @@ export interface AssetResponseOptions {
   cacheControl?: string;
 }
 
+/**
+ * True when a request is a fresh start rather than a seek.
+ *
+ * Published songs count a play only on the first fetch, so dragging the player
+ * around does not inflate the number. Browsers send `bytes=0-` (or no range at
+ * all) to begin playback.
+ */
+export function isFirstFetch(request: Request): boolean {
+  const range = request.headers.get("range");
+  if (!range) return true;
+  const match = /bytes=(\d*)-/.exec(range);
+  return Boolean(match && (match[1] === "" || match[1] === "0"));
+}
+
 export function assetResponse(
   request: Request,
   data: Buffer,

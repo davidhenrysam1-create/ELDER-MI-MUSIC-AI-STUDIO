@@ -41,10 +41,13 @@ export const defaultSettings: StudioSettings = {
 };
 
 const emptyDb = (): Database => ({
-  version: 2,
+  version: 3,
   users: [],
   sessions: [],
   shares: [],
+  releases: [],
+  follows: [],
+  likes: [],
   projects: [],
   exports: [],
   voiceProfiles: [],
@@ -157,6 +160,20 @@ function migrate(db: Database) {
     licence: job.licence ?? "",
   }));
   db.spend = { lifetimeUsd: db.spend?.lifetimeUsd ?? 0 };
+  // Publishing was added in version 3. An older database simply starts with
+  // nothing published, which is the safe default: no release, no public page.
+  db.releases = (db.releases ?? []).map((release) => ({
+    ...release,
+    description: release.description ?? "",
+    allowDownload: release.allowDownload === true,
+    visibility: release.visibility === "unlisted" ? "unlisted" : "public",
+    plays: release.plays ?? 0,
+    downloads: release.downloads ?? 0,
+  }));
+  db.follows = (db.follows ?? []).filter(
+    (follow) => follow?.followerId && follow?.followingId && follow.followerId !== follow.followingId,
+  );
+  db.likes = (db.likes ?? []).filter((like) => like?.userId && like?.releaseId);
 }
 
 async function persist(db: Database) {

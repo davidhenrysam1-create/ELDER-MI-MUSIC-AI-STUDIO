@@ -126,6 +126,22 @@ const FAQ: { q: string; a: string }[] = [
     a: "Open Share with friends, pick the project, choose whether they may download it and whether it expires, then press Create listening link. Copy the link the moment it appears — only a hash of it is stored, so it cannot be shown again — and send it by WhatsApp or message. Your friend opens it in any browser: no account, no app. They hear only the audio on your mixer and never see your settings or other projects. Revoke it any time and it stops working immediately.",
   },
   {
+    q: "How do I publish a song so other people can find it?",
+    a: "Open Publish a song, pick a project, pick one finished file from it, give it a title and press Publish. Public songs appear in Discover and on your page (/u/yourhandle); unlisted songs appear only on your page, for something finished but not announced yet. Publishing needs a public handle — set it in My account first. You can switch a song between public and unlisted, turn downloads on or off, or unpublish it at any time; none of that touches the project, the audio or your versions.",
+  },
+  {
+    q: "What do the play, download, like and follower numbers mean?",
+    a: "They are real counts from the studio database, and nothing else. A play is counted once when a listener starts a song (seeking does not count again). A download is counted when somebody with an account saves a file you allowed downloads for. A like or a follow is a single row per account, so pressing again removes it — the numbers can go down. If a number is zero, nobody has done that yet; the studio never fills counters with sample activity.",
+  },
+  {
+    q: "Who can download my song?",
+    a: "Downloads are off by default. Turn them on for a release and any signed-in account can save the file, with each download counted. Listeners without an account can still play a public song — the button says Sign in to download instead of failing. Turning downloads back off stops new downloads immediately; the artist can always export their own project from the studio.",
+  },
+  {
+    q: "Does publishing expose my project, stems or mixer settings?",
+    a: "No. A release is one finished audio file plus a title, notes and your public profile facts. The project document — mixer channels, mastering chain, every stem, all versions and any file you did not publish — is never sent to listeners. Unpublishing removes the release and leaves the project exactly as it was.",
+  },
+  {
     q: "Can another account see my projects?",
     a: "No. Every project, audio object, export, voice profile and share link belongs to the account that created it, and the server checks that owner on every request. Trying another account's id returns “not found”, so ids cannot be probed. The one exception is a project you deliberately share: the link exposes that project's mixer audio, read-only.",
   },

@@ -107,7 +107,10 @@ brand mark can be regenerated without image tooling.
 4. **Mastering** — in *Sam Mastering Studio*, the latest bounce is preselected. *Analyse source*,
    choose a profile, adjust the targets, *Render master*, compare original vs master with loudness
    matching, then open the *Technical report* and export WAV/MP3.
-5. **Everything persists** — projects, audio objects, mixer state, mastering targets, versions,
+5. **Publish** — *Publish a song* takes one finished file from a project, adds a title and notes, and
+   puts it on the public side: **Discover** for everyone, or unlisted for your page only. Listeners can
+   play it without downloading anything, like it, follow you and — if you allow it — download it.
+6. **Everything persists** — projects, audio objects, mixer state, mastering targets, versions,
    jobs and exports are stored server-side. "Save version" snapshots the studio state; restoring is
    reversible.
 
@@ -290,6 +293,30 @@ Limits worth knowing: a link only works while this studio server is reachable, s
 network need the app hosted or tunnelled first. Sharing is per project, not per file; export history
 still holds finished files, and the owner can hand them over directly.
 
+### Publishing, likes and follows
+
+Sharing is private and per link. **Publishing** is the public side: a song other accounts (and anyone
+with the profile link) can find, play, like and — if you allow it — download.
+
+| Where | What it does |
+| --- | --- |
+| `/publish` | Pick a project and one finished file, give it a title and notes, choose **public** (Discover) or **unlisted** (your page only), and decide whether downloads are allowed. Re-publishing the same project updates the same release instead of making duplicates. |
+| `/discover` | Every published song, newest first: **All songs**, **Following** (only creators you follow, plus your own) and **My releases** (including unlisted). Search by title, creator or genre. |
+| `/u/<handle>` | A creator's public page: roles, bio, social links, follower counts and their released songs. No account needed to listen. |
+
+What the numbers mean — and nothing more:
+
+- **Plays** count once when a listener starts a song, not on every seek and not on page load.
+- **Downloads** need a signed-in account **and** the creator's permission; each one is counted.
+- **Likes** and **follows** are one row per account, so pressing again removes the like or unfollows —
+  counters can go down as well as up.
+- **Followers** counts creators following you; there is no fake inflation anywhere.
+
+What stays private: the project behind a release, its mixer, mastering chain, stems, versions and every
+file you did not publish. Unpublishing a song removes it from the public site and leaves the project
+untouched. Comments, tipping/subscriptions and like/follow notifications are **not built** and are
+labelled planned in the app.
+
 ---
 
 ## 6. Configuration
@@ -338,8 +365,10 @@ lib/
   routes.ts              public-route rules shared by the shell and the provider
   client/                Studio provider, API client, audio cache, mixdown, ZIP, export
   server/                JSON store, repository, storage, prompt engine, validation
-    auth.ts              accounts, scrypt hashing, sessions, ownership guard
+    auth.ts              accounts, scrypt hashing, sessions, roles, admin, ownership guard
     shares.ts            read-only share links (hashed tokens, expiry, passcode)
+    social.ts            releases, likes, follows, creator pages, play/download counters
+    stream.ts            Range-capable audio responses shared by every player
     providers/           one adapter per music-generation vendor + registry
     generation.ts        job orchestration, budget gates, provenance, spend ledger
   types.ts, projects.ts  Domain model and defaults
@@ -360,6 +389,9 @@ tests/                   Vitest suites (DSP, prompt engine, persistence, migrati
 
 - Private audio is stored outside `public/` and served only through `/api/assets/:id/audio`, which
   requires the owning project id and supports ranges.
+- Published audio is the one deliberate exception: `/api/releases/:id/audio` serves a song you chose to
+  publish, and `/api/releases/:id/download` only when you allowed downloads **and** the listener has an
+  account. Everything else stays behind the owner check.
 - Uploads are validated by extension, size and duration on the server as well as in the browser.
 - Original files are never overwritten; every generated layer, bounce and master is a new object.
 - Deleting a project removes its audio files and exports. Settings → *Delete all studio data* wipes
@@ -386,7 +418,7 @@ scaling.
 ## 9. Testing
 
 ```bash
-npm test          # 232 tests across 16 files
+npm test          # 251 tests across 17 files
 npm run typecheck
 npm run build
 ```
@@ -429,6 +461,15 @@ Covered (`tests/`):
 - Google and verification: first sign-in creates a verified account, repeat sign-ins link instead of
   duplicating, an existing password account is linked, suspended accounts are refused, verification
   tokens are stored only as a hash, expire, and work once.
+- Publishing: only artist/producer/promoter accounts with a handle can publish, another account's file
+  cannot be published (404), a release is updated rather than duplicated, unlisted songs stay out of
+  Discover but appear on the creator's page, and unpublishing leaves the project intact.
+- Likes, follows and counters: one row per account per like/follow, counts rise and fall truthfully,
+  self-follow is refused, the following feed excludes accounts you do not follow, and a suspended
+  creator's songs disappear from Discover, their page and direct links.
+- Listening and downloads: a public song streams for a visitor and counts one play, a listen-only
+  release refuses downloads (403), a visitor without an account cannot download (401), and the stats
+  an account sees come from the same rows the listeners created.
 
 ---
 

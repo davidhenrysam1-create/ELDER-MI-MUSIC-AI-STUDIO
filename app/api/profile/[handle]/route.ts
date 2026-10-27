@@ -1,13 +1,15 @@
 /**
  * GET /api/profile/<handle>
  *
- * Public profile for `/u/<handle>`: name, roles, bio and social links only.
- * No email, sessions or moderation fields — see `getPublicProfile()`.
+ * A creator's public page: name, roles, bio, social links, follower counts and
+ * their published songs. Never an email address, a session or a moderation
+ * field — see `creatorPage()`.
  *
- * Published songs will be added to this response in the publishing phase; until
- * then the response says `published: []` rather than inventing a discography.
+ * Signed-in listeners also get `likedByViewer` / `followingViewer`, so the page
+ * can show the real state of the Like and Follow buttons.
  */
-import { getPublicProfile } from "@/lib/server/auth";
+import { currentUser } from "@/lib/server/auth";
+import { creatorPage } from "@/lib/server/social";
 import { jsonError } from "@/lib/server/validation";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +18,9 @@ type Params = { params: Promise<{ handle: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
   const { handle } = await params;
-  const profile = await getPublicProfile(decodeURIComponent(handle));
-  if (!profile) return jsonError("No creator with that handle.", 404);
-  return Response.json({
-    profile,
-    published: [],
-    publishingAvailable: false,
-    note: "Published songs and follower counts are not implemented yet; this build shows the profile only.",
-  });
+  const viewer = await currentUser();
+  const page = await creatorPage(decodeURIComponent(handle), viewer?.id ?? null);
+  if (!page) return jsonError("No creator with that handle.", 404);
+  // `signedIn` lets the page label Like/Follow honestly instead of failing on click.
+  return Response.json({ ...page, signedIn: Boolean(viewer) });
 }
