@@ -153,6 +153,48 @@ brand mark can be regenerated without image tooling.
 
 ---
 
+## 5b. AI music generation (beats, songs, vocal hooks)
+
+The studio can now **create new audio** — a beat, an instrumental, a full song or a vocal hook — using
+hosted models. It is deliberately behind four honest gates:
+
+| Gate | Behaviour |
+| --- | --- |
+| Provider key | Each provider is listed as **Real** only when its key is present; otherwise **Awaiting configuration**, with the exact variable name shown. |
+| Paid generation switch | Off by default. While off, `POST /api/generate` refuses every request with **403** and no vendor is contacted. |
+| Spend cap | A request whose estimate would push tracked spend past `spendCapUsd` is refused with **402**. Tracked spend is the studio's estimate from configurable per-second prices — the vendor invoice is authoritative. |
+| Provenance | Every generated file is stored as a normal asset with `providerId`, `modelId`, `prompt`, `licence`, `costUsd` and `jobId` recorded on it. |
+
+Supported adapters (all optional, all billed by the vendor to your own account):
+
+| Provider | Kinds | Max length | Key |
+| --- | --- | --- | --- |
+| Google Lyria 2 (Vertex AI) | beat, instrumental | 30 s | `GOOGLE_API_KEY` **or** `GOOGLE_VERTEX_ACCESS_TOKEN` + `GOOGLE_VERTEX_PROJECT` |
+| Stability Stable Audio 2 | beat, instrumental | 190 s | `STABILITY_API_KEY` |
+| ElevenLabs Music | song, vocals | 300 s | `ELEVENLABS_API_KEY` |
+| MusicGen (Replicate) | beat, instrumental | 120 s | `REPLICATE_API_TOKEN` |
+
+**No model ships with this repository.** There is no local Mersenne/Torch-style model to download: the
+studio is a browser + Node application, so "AI generation" always means a hosted provider you supply a
+key for. Mixing, mastering, analysis, vocal layering and export are untouched by this and work fully
+offline.
+
+Where it appears: **Sam Mix Studio** (Generate panel above the mixing stages) and **Sam Vocal Studio**
+(Generate panel in the vocal tools column); the catalogue, spend cap and paid-generation switch live in
+**Settings → AI music generation**. The existing `GEMINI_API_KEY` integration is unchanged and still
+only drives prompt improvement and mixing suggestions.
+
+How to try it safely:
+
+1. Add one provider key above to `.env.local` and restart (`npm run dev`).
+2. Settings → *Allow paid generation* on, cap at something small (e.g. `1`).
+3. In Sam Mix or Sam Vocal, pick the provider, write a brief, watch the live estimate, press
+   **Generate audio**.
+4. The job list shows the provider's own status text. Long-running providers (Replicate) are polled;
+   you can cancel, and a cancelled or failed job is never charged.
+
+---
+
 ## 6. Configuration
 
 Copy `.env.example` to `.env.local`:
@@ -164,6 +206,12 @@ Copy `.env.example` to `.env.local`:
 | `DATA_DIR` | Optional private data directory (default `./.data`). |
 | `MAX_UPLOAD_MB`, `MAX_DURATION_SEC` | Default upload limits; editable in Settings. |
 | `VOICE_CONVERSION_API_URL` | Reserved for a licensed voice-conversion adapter. |
+| `GOOGLE_API_KEY` / `GOOGLE_VERTEX_ACCESS_TOKEN` + `GOOGLE_VERTEX_PROJECT` | Optional. Enables Lyria 2 beat/instrumental generation. |
+| `STABILITY_API_KEY` | Optional. Enables Stable Audio 2 beat/instrumental generation. |
+| `ELEVENLABS_API_KEY` | Optional. Enables ElevenLabs Music (songs and vocal hooks). |
+| `REPLICATE_API_TOKEN` | Optional. Enables MusicGen on Replicate (async, polled). |
+| `SPEND_CAP_USD` | Optional, default `5`. Hard ceiling on tracked generation spend. |
+| `*_USD_PER_SEC` | Optional cost overrides: `LYRIA_`, `STABLE_AUDIO_`, `ELEVENLABS_`, `REPLICATE_MUSICGEN_`. |
 | `STUDIO_PASSWORD`, `STUDIO_USER` | Optional HTTP Basic auth for the whole studio. |
 
 Secrets never reach the browser: API routes read them and return only results.
@@ -178,12 +226,15 @@ app/                     Next.js App Router pages + API route handlers
   vocal|mix|mastering/   The three studios
   projects|voice-profiles|exports|settings|docs/
   api/                   projects, assets (upload/stream), exports, jobs,
-                         prompt improvement, mixing recommendations, settings
+                         prompt improvement, mixing recommendations, settings,
+                         providers, generate (+ /generate/[id])
 components/              Shell, audio widgets (waveform, player, upload), studio panels
 lib/
   audio/                 DSP: analysis, pitch, render, WAV/MP3, peaks, arrangement
   client/                Studio provider, API client, audio cache, mixdown, ZIP, export
   server/                JSON store, repository, storage, prompt engine, validation
+    providers/           one adapter per music-generation vendor + registry
+    generation.ts        job orchestration, budget gates, provenance, spend ledger
   types.ts, projects.ts  Domain model and defaults
 tests/                   Vitest suites (DSP, prompt engine, persistence, migration)
 ```
@@ -207,7 +258,11 @@ tests/                   Vitest suites (DSP, prompt engine, persistence, migrati
 - Deleting a project removes its audio files and exports. Settings → *Delete all studio data* wipes
   everything.
 - Voice profiles require explicit consent (name + confirmation) before they can be created.
-- No audio leaves the studio server; Gemini receives **text prompts only**, and only if configured.
+- No audio leaves the studio server for analysis, mixing or mastering; Gemini receives **text prompts
+  only**, and only if configured.
+- Music generation is the one outbound path for audio: your **text brief** is sent to the provider you
+  chose, and the rendered file is downloaded into private storage. Nothing is uploaded to a provider
+  unless you press *Generate audio* with paid generation enabled.
 
 This build is a **single-operator studio**. Auth is optional and off by default so local use needs no
 setup: set `STUDIO_PASSWORD` (and optionally `STUDIO_USER`, default `studio`) to require HTTP Basic

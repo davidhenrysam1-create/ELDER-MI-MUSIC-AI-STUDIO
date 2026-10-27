@@ -22,6 +22,7 @@ import { AudioAssetSelect } from "@/components/studio/AudioAssetSelect";
 import { AnalysisPanel } from "@/components/studio/AnalysisPanel";
 import { JobStatusCard, useJobRunner } from "@/components/studio/useJobRunner";
 import { UploadZone } from "@/components/audio/UploadZone";
+import { GeneratePanel } from "@/components/studio/GeneratePanel";
 import { Waveform } from "@/components/audio/Waveform";
 import { SectionWaveform } from "@/components/audio/SectionWaveform";
 import { useStudio } from "@/lib/client/studio";
@@ -446,6 +447,8 @@ function VocalStudio() {
               </div>
             ) : null}
           </GlassCard>
+
+          <GeneratePanel studio="vocal" defaultKind="vocals" />
 
           <GlassCard>
             <SectionHeading

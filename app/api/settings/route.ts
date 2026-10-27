@@ -22,6 +22,13 @@ export async function PATCH(request: Request) {
     patch.defaultExportFormat = f as StudioSettings["defaultExportFormat"];
   }
   if (typeof body.autoSave === "boolean") patch.autoSave = body.autoSave;
+  // Paid generation is a two-part control: the switch plus a hard ceiling.
+  if (typeof body.allowPaidGeneration === "boolean") {
+    patch.allowPaidGeneration = body.allowPaidGeneration;
+  }
+  if (body.spendCapUsd != null) {
+    patch.spendCapUsd = Math.round(asNumber(body.spendCapUsd, 5, 0, 500) * 100) / 100;
+  }
   if (typeof body.dither16Bit === "boolean") patch.dither16Bit = body.dither16Bit;
   if (typeof body.processingQuality === "string") {
     const q = asString(body.processingQuality, "balanced");

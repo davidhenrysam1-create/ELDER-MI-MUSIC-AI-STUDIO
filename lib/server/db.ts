@@ -27,6 +27,11 @@ const AUDIO_DIR = path.join(DATA_DIR, "audio");
 const EXPORT_DIR = path.join(DATA_DIR, "exports");
 
 export const defaultSettings: StudioSettings = {
+  // Paid generation is opt-in: with a key present but this off, no billable
+  // call is ever made.
+  allowPaidGeneration: false,
+  // Conservative default ceiling for the studio's own spend tracker.
+  spendCapUsd: Number(process.env.SPEND_CAP_USD ?? 5),
   defaultExportFormat: "wav24",
   dither16Bit: true,
   autoSave: true,
@@ -40,6 +45,8 @@ const emptyDb = (): Database => ({
   projects: [],
   exports: [],
   voiceProfiles: [],
+  generations: [],
+  spend: { lifetimeUsd: 0 },
   settings: { ...defaultSettings },
 });
 
@@ -125,6 +132,20 @@ function migrate(db: Database) {
   });
   db.exports = db.exports ?? [];
   db.voiceProfiles = db.voiceProfiles ?? [];
+  // Generation jobs and the spend ledger were added later; backfill them so an
+  // older database keeps working without a manual migration.
+  db.generations = (db.generations ?? []).map((job) => ({
+    ...job,
+    negativePrompt: job.negativePrompt ?? null,
+    providerJobId: job.providerJobId ?? null,
+    assetId: job.assetId ?? null,
+    costEstimateUsd: job.costEstimateUsd ?? 0,
+    costChargedUsd: job.costChargedUsd ?? 0,
+    progress: job.progress ?? 0,
+    message: job.message ?? "",
+    licence: job.licence ?? "",
+  }));
+  db.spend = { lifetimeUsd: db.spend?.lifetimeUsd ?? 0 };
 }
 
 async function persist(db: Database) {

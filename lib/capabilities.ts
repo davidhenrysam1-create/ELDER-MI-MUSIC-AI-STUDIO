@@ -26,6 +26,20 @@ export const STATUS_LABEL: Record<CapabilityStatus, string> = {
 
 export const CAPABILITIES: Capability[] = [
   {
+    name: "Generation billing guards (paid off by default, hard spend cap)",
+    area: "Platform",
+    status: "ready",
+    detail:
+      "`allowPaidGeneration` defaults to off and refuses requests with 403; an estimate that would pass `spendCapUsd` is refused with 402. Every charge is an estimate from published per-second prices — the provider invoice is authoritative.",
+  },
+  {
+    name: "A local model bundled with the studio",
+    area: "Platform",
+    status: "planned",
+    detail:
+      "No neural model is bundled: the download is a browser studio, not a model runtime. All generation is hosted and requires an API key.",
+  },
+  {
     name: "Project creation, private audio storage and persistence",
     area: "Platform",
     status: "ready",
@@ -89,11 +103,32 @@ export const CAPABILITIES: Capability[] = [
       "Requires a licensed conversion provider plus consent. The tool is shown as unavailable; no fake output is produced.",
   },
   {
-    name: "AI singing synthesis from lyrics",
+    name: "Generated vocals and songs (hosted models)",
+    area: "Sam Vocal Studio",
+    status: "needs",
+    detail:
+      "Implemented against ElevenLabs Music (`ELEVENLABS_API_KEY`) and Replicate MusicGen (`REPLICATE_API_TOKEN`). Needs your own provider key; nothing renders without one, and the licence is the vendor's.",
+  },
+  {
+    name: "Singing synthesis from your own lyrics with a local model",
     area: "Sam Vocal Studio",
     status: "planned",
     detail:
-      "Not implemented. It needs a singing-voice model and licensing; this studio only arranges layers from your recording.",
+      "No singing voice model ships with the studio. Hosted generation (above) writes new audio from a text brief; it does not sing your lyric sheet with your voice.",
+  },
+  {
+    name: "Beat and instrumental generation (hosted models)",
+    area: "Sam Mix Studio",
+    status: "needs",
+    detail:
+      "Implemented against Google Lyria 2 (`GOOGLE_API_KEY` / Vertex token), Stability Stable Audio 2 (`STABILITY_API_KEY`) and Replicate MusicGen (`REPLICATE_API_TOKEN`). Needs a key; results are imported as ordinary editable audio with prompt and licence recorded.",
+  },
+  {
+    name: "Automatic stem separation of a generated or uploaded mix",
+    area: "Sam Mix Studio",
+    status: "planned",
+    detail:
+      "Not wired up. A hosted Demucs model on Replicate is the intended path; until then split stems in your own tool and import them here.",
   },
   {
     name: "Stem import incl. ZIP packages",

@@ -1,28 +1,40 @@
 import { storageUsage } from "@/lib/server/db";
 import { geminiConfigured, geminiModel } from "@/lib/server/promptEngine";
+import { listDescriptors, providerSummary } from "@/lib/server/providers/registry";
+import { spendSummary } from "@/lib/server/generation";
 import { getSettings } from "@/lib/server/repo";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const settings = await getSettings();
-  const usage = await storageUsage();
+  const [settings, usage, spend] = await Promise.all([
+    getSettings(),
+    storageUsage(),
+    spendSummary(),
+  ]);
   return Response.json({
     version: "1.0.0",
     settings,
     storage: usage,
+    spend,
     providers: {
       gemini: { configured: geminiConfigured(), model: geminiModel() },
       voiceConversion: {
         configured: Boolean(process.env.VOICE_CONVERSION_API_URL?.trim()),
         note: "Neural voice transformation requires a licensed external provider.",
       },
+      // Music generation: one entry per adapter, with its real configuration
+      // state so Settings and the studios can label unavailable options.
+      generation: listDescriptors(),
+      generationSummary: providerSummary(),
     },
     engines: {
       analysis: "Local EBU R128 / ITU-R BS.1770 implementation (K-weighting, gated LUFS, oversampled true peak)",
       playback: "Web Audio API",
       rendering: "OfflineAudioContext + in-house DSP post-chain",
       encoding: "In-house WAV encoder / lamejs MP3 encoder",
+      generation:
+        "Hosted providers only (Lyria, Stable Audio, ElevenLabs Music, Replicate MusicGen). No local model is bundled.",
     },
   });
 }

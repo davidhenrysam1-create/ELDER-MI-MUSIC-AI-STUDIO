@@ -145,3 +145,76 @@ export function formatDuration(seconds: number) {
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Decode a PCM / IEEE-float WAV file into channel data.
+ *
+ * The browser does this with `decodeAudioData`, but server-side code has no
+ * AudioContext, so generated WAV files are decoded here to derive real peaks
+ * and duration. Compressed formats return null: lamejs only encodes MP3, and
+ * this build deliberately does not ship an MP3 decoder on the server.
+ */
+export function decodeWavChannels(bytes: Uint8Array): {
+  channels: Float32Array[];
+  sampleRate: number;
+  frames: number;
+} | null {
+  const info = readWavInfo(bytes);
+  if (!info) return null;
+  // Only classic PCM (1) and IEEE float (3) are handled here.
+  if (info.audioFormat !== 1 && info.audioFormat !== 3) return null;
+  if (![8, 16, 24, 32].includes(info.bitDepth)) return null;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let dataOffset = -1;
+  let dataSize = 0;
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = String.fromCharCode(
+      bytes[offset],
+      bytes[offset + 1],
+      bytes[offset + 2],
+      bytes[offset + 3],
+    );
+    const size = view.getUint32(offset + 4, true);
+    if (id === "data") {
+      dataOffset = offset + 8;
+      dataSize = Math.min(size, bytes.length - dataOffset);
+      break;
+    }
+    offset = offset + 8 + size + (size % 2);
+  }
+  if (dataOffset < 0 || dataSize <= 0) return null;
+
+  const bytesPerSample = info.bitDepth / 8;
+  const frameBytes = bytesPerSample * info.channels;
+  const frames = Math.floor(dataSize / frameBytes);
+  if (frames <= 0) return null;
+
+  const channels = Array.from({ length: info.channels }, () => new Float32Array(frames));
+  for (let frame = 0; frame < frames; frame++) {
+    for (let channel = 0; channel < info.channels; channel++) {
+      const at = dataOffset + frame * frameBytes + channel * bytesPerSample;
+      let value = 0;
+      if (info.audioFormat === 3 && info.bitDepth === 32) {
+        value = view.getFloat32(at, true);
+      } else if (info.bitDepth === 8) {
+        value = (view.getUint8(at) - 128) / 128;
+      } else if (info.bitDepth === 16) {
+        value = view.getInt16(at, true) / 32768;
+      } else if (info.bitDepth === 24) {
+        // 24-bit little-endian: assemble three bytes into a signed int.
+        const b0 = view.getUint8(at);
+        const b1 = view.getUint8(at + 1);
+        const b2 = view.getUint8(at + 2);
+        let int = b0 | (b1 << 8) | (b2 << 16);
+        if (int & 0x800000) int |= ~0xffffff;
+        value = int / 8388608;
+      } else if (info.bitDepth === 32) {
+        value = view.getInt32(at, true) / 2147483648;
+      }
+      channels[channel][frame] = value;
+    }
+  }
+  return { channels, sampleRate: info.sampleRate, frames };
+}
