@@ -40,7 +40,8 @@ export const stableAudioProvider: MusicProvider = {
       kinds: ["beat", "instrumental"],
       configured: Boolean(apiKey()),
       keyEnv: ["STABILITY_API_KEY"],
-      model: envString("STABLE_AUDIO_MODEL") ?? DEFAULT_PATH.split("/")[3] ?? "stable-audio-2",
+      // The model name shown to the producer, not a path fragment.
+      model: envString("STABLE_AUDIO_MODEL") ?? "stable-audio-2",
       docsUrl: "https://platform.stability.ai/docs/api-reference#tag/audio",
       licence:
         "Stability AI terms apply; commercial use depends on your plan (Community vs. Enterprise). Generated audio is yours to use under those terms.",
