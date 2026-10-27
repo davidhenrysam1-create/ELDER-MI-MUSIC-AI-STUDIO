@@ -208,7 +208,7 @@ audio, exports, voice profiles and share links.
 | Screen | What it does |
 | --- | --- |
 | `/signup` | Name, email, password (8+ chars) **and your roles** — artist, producer, engineer (beat maker), promoter, or several at once. The **first** account becomes the studio owner and adopts anything saved before accounts existed, so upgrading loses nothing. |
-| `/login` | Email + password, with "show password" and a return path (`?next=`). Shows **Continue with Google** once Google is configured, and says "awaiting configuration" until then. |
+| `/login` | Email + password, with "show password" and a return path (`?next=`). **Continue with Google** is always a real button: one-tap sign-in once the Google client exists, and until then it opens a set-up panel (see *Turning on Google sign-in* below). |
 | `/welcome` | The role picker, for accounts that arrive without roles (Google sign-in cannot ask). |
 | `/account` | Change display name, roles, public handle, bio and AudioMack / Instagram / Facebook links; change password (signs every device out); see active sessions; verification status; close the account. |
 | `/u/<handle>` | Your **public page**: name, roles, bio and social links — never your email. No sign-in needed to view it. |
@@ -271,14 +271,33 @@ Honest gaps, stated in the UI too:
 - **Email verification links** are issued and expire after 24 hours, but posting them needs
   `RESEND_API_KEY` + `EMAIL_FROM`. Until then the account page says *"no email was sent"* and the admin
   verifies accounts by hand.
-- **Continue with Google** is code-complete but visibly off until `GOOGLE_CLIENT_ID` and
-  `GOOGLE_CLIENT_SECRET` exist.
-- **Publishing, follows, likes and downloads on public pages** are planned, not built: a profile page
-  exists, its music shelf says so, and finished songs travel as share links today.
+- **Continue with Google** is code-complete and always visible. It becomes a one-tap sign-in as soon as
+  `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` exist; until then it opens a one-time set-up panel with
+  the exact redirect URI instead of sending anyone to a Google error page.
+- **Publishing, follows, likes and downloads** are built: `/publish` releases a finished project,
+  `/discover` lists what is public, and `/u/<handle>` collects a creator's releases. Paid features
+  (comments, tipping, notifications) are still planned.
 - **No email change** yet.
 
 `ALLOW_SIGNUP=false` closes new accounts; the first account can still be created, and existing accounts
 keep working.
+
+### "I sign in and it throws me back to the login screen"
+
+That is almost never a wrong password — the POST returns `200` and the browser then refuses to keep the
+session cookie. It happens when the studio is shown **inside another site's frame** (a hosted preview
+panel, an embedded browser) and that browser blocks third-party cookies.
+
+What the app does about it, automatically:
+
+- over HTTPS the session cookie is set `SameSite=None; Secure; Partitioned` (CHIPS), which is what lets a
+  framed preview hold a session at all — see `lib/server/cookies.ts`;
+- because `SameSite=None` cookies travel on cross-site requests, `middleware.ts` now rejects any
+  `POST`/`PUT`/`PATCH`/`DELETE` whose `Origin` does not match the host being served;
+- if the browser still refuses (strict "block all third-party cookies" settings), the login screen says
+  so and offers **Open the studio in its own tab**, where the cookie is first-party.
+
+So: if you see that message, use the tab it offers, or open the preview URL directly in a new tab.
 
 ### Sharing with friends
 
@@ -340,8 +359,26 @@ Copy `.env.example` to `.env.local`:
 | `ADMIN_EMAIL` | **Required for admin access.** The one address that always has admin rights. Leave it empty and nobody can open `/admin`. |
 | `ADMIN_BOOTSTRAP_CODE` | Optional. Fixed one-time admin code while Google is unconfigured; random and printed to the log if unset. |
 | `ADMIN_PASSWORD` | Optional (8+ chars). Seeds the admin's password once so `/login` works with `ADMIN_EMAIL` + this password; change it in My account afterwards. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Turns on **Continue with Google**. Add `/api/auth/google/callback` as an authorised redirect URI. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Turns on **Continue with Google**. Add `/api/auth/google/callback` as an authorised redirect URI (see below). |
 | `GOOGLE_REDIRECT_URI` | Optional. Pins the redirect URI when it differs from `NEXT_PUBLIC_SITE_URL`. |
+
+#### Turning on Google sign-in (about two minutes, once)
+
+1. Open [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) and
+   create an **OAuth client ID** of type **Web application** (fill in the OAuth consent screen first if
+   Google asks).
+2. Add this as an **Authorised redirect URI** — exactly, no trailing slash, matching the address you
+   actually open the studio on:
+   `https://<the-address-in-your-browser>/api/auth/google/callback`
+   The sign-in screen prints the correct value for you: click **Continue with Google** while it is not
+   configured and copy it from the panel.
+3. Put the **Client ID** and **Client secret** into `.env.local` as `GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET`, then restart the server.
+4. Reload `/login`: the same button now signs people in with one tap. Google-verified addresses arrive
+   already verified, and a brand-new Google account lands on `/welcome` to choose its roles.
+
+If the address ever changes (a new preview URL, a real domain), add the new redirect URI as well —
+Google allows several. Until credentials exist nothing is faked: no request leaves the server.
 | `RESEND_API_KEY`, `EMAIL_FROM` | Optional. The only way verification emails are actually sent. Without them nothing is mailed and the UI says so. |
 | `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close public sign-up. |
 | `MAX_UPLOAD_MB`, `MAX_DURATION_SEC` | Default upload limits; editable in Settings. |

@@ -40,6 +40,27 @@ export function googleStatus(): { configured: boolean; reason: string } {
   return { configured: true, reason: "Google sign-in is configured." };
 }
 
+/**
+ * The address the browser actually used.
+ *
+ * Behind a proxy (every hosted preview, and most real deployments) `request.url`
+ * can carry the *internal* host — `http://0.0.0.0:3200` — while the browser is on
+ * `https://…`. Handing that to Google produces `redirect_uri_mismatch` after the
+ * user has already picked an account, so build the origin from the forwarded
+ * headers the proxy sets, and fall back to the request URL only when they are
+ * absent (a laptop talking to itself).
+ */
+export function requestOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const proto =
+    (request.headers.get("x-forwarded-proto") ?? "").split(",")[0]?.trim() ||
+    url.protocol.replace(":", "");
+  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "")
+    .split(",")[0]
+    ?.trim();
+  return host ? `${proto}://${host}` : url.origin;
+}
+
 /** The callback URL Google must be told about. Must match the Cloud console. */
 export function redirectUri(origin: string): string {
   const configured = process.env.GOOGLE_REDIRECT_URI?.trim();

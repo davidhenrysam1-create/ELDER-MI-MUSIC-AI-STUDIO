@@ -50,7 +50,7 @@ const ENV_VARS = [
   {
     key: "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET",
     detail:
-      "Optional. Enables Continue with Google. Register /api/auth/google/callback as an authorised redirect URI. Without them the button reads awaiting configuration.",
+      "Optional. Enables Continue with Google. Register <your address>/api/auth/google/callback as an authorised redirect URI (click the Google button before configuring it — the panel prints the exact address to copy). Without them the button opens that set-up panel; nothing is faked.",
   },
   {
     key: "GOOGLE_REDIRECT_URI",
@@ -336,6 +336,15 @@ export default function DocsPage() {
             (change it in My account once you are in), Google sign-in with that address, or — while Google
             is unconfigured — the one-time code printed in the server log at{" "}
             <span className="mono">/admin-bootstrap</span>. No admin password lives in the repository.
+          </li>
+          <li>
+            <span className="text-softwhite">Session cookies:</span> on plain HTTP the session cookie is{" "}
+            <span className="mono">SameSite=Lax</span>. Over HTTPS — including inside an embedded preview
+            frame — it becomes <span className="mono">SameSite=None; Secure; Partitioned</span>, because a
+            frame makes the studio a third-party context where a Lax cookie is dropped (the symptom is a
+            sign-in that returns you to /login). Because of that, every write must carry a matching{" "}
+            <span className="mono">Origin</span> header or it is refused with a 403. See{" "}
+            <span className="mono">lib/server/cookies.ts</span>.
           </li>
         </ul>
       </GlassCard>

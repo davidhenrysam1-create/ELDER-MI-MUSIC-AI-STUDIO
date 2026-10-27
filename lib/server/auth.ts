@@ -7,8 +7,12 @@
  *    (`scrypt$N$r$p$salt$hash`) is kept in the database.
  *  - The session cookie holds a random 256-bit token. The database stores only
  *    its SHA-256, so a copy of `db.json` cannot be replayed as a login.
- *  - The cookie is `HttpOnly` (no JavaScript access), `SameSite=Lax` (no
- *    cross-site posting) and `Secure` on HTTPS deployments.
+ *  - The cookie is `HttpOnly` (no JavaScript access) and `SameSite=Lax` on a
+ *    plain first-party page. When the studio is served over HTTPS — including
+ *    inside an embedded preview iframe — it becomes `SameSite=None; Secure;
+ *    Partitioned` so the browser actually keeps it. See `lib/server/cookies.ts`
+ *    for why, and `middleware.ts` for the matching Origin check that replaces
+ *    the CSRF protection `Lax` used to give us.
  *  - There is no email delivery in this build, so there is no "we sent you a
  *    link" theatre: recovery is done from the account page while signed in, or
  *    by the owner from the server.
@@ -21,6 +25,7 @@ import { createHash, randomBytes, randomUUID, scrypt as scryptCb, timingSafeEqua
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
 import { mutateDb, readDb } from "@/lib/server/db";
+import { persistentCookieOptions } from "@/lib/server/cookies";
 import { ACCOUNT_ROLES, canUseStudio, studiosForRoles } from "@/lib/roles";
 import type {
   AccountRole,
@@ -624,12 +629,27 @@ export async function startSession(userId: string, userAgent?: string | null): P
   const store = await cookieStore();
   store?.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires,
+    ...(await persistentCookieOptions(expires)),
   });
   return token;
+}
+
+/**
+ * Remove the session cookie.
+ *
+ * `store.delete()` would emit `Set-Cookie: eldermi_session=;` without the
+ * SameSite/Secure/Partitioned attributes the cookie was created with, and a
+ * browser will not match those to the stored cookie — so the "signed out"
+ * browser can keep sending the old token. Setting an expired value with the
+ * *same* attributes is the reliable way to clear it.
+ */
+async function clearSessionCookie(): Promise<void> {
+  const store = await cookieStore();
+  store?.set(SESSION_COOKIE, "", {
+    ...(await persistentCookieOptions(new Date(0))),
+    httpOnly: true,
+    maxAge: 0,
+  });
 }
 
 /** Read the signed-in account, or null. Never throws for a missing cookie. */
@@ -805,7 +825,7 @@ export async function endSession(): Promise<void> {
       state.sessions = state.sessions.filter((session) => session.id !== id);
     });
   }
-  store?.delete(SESSION_COOKIE);
+  await clearSessionCookie();
 }
 
 /** Sign out everywhere (all devices) for one account. */
@@ -813,8 +833,7 @@ export async function endAllSessions(userId: string): Promise<void> {
   await mutateDb((state) => {
     state.sessions = state.sessions.filter((session) => session.userId !== userId);
   });
-  const store = await cookieStore();
-  store?.delete(SESSION_COOKIE);
+  await clearSessionCookie();
 }
 
 /* ------------------------------------------------------------------ */

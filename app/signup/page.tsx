@@ -8,9 +8,14 @@
  * studio tools appear after sign-in, so they are asked up front instead of being
  * discovered later.
  *
+ * "Continue with Google" sits above the form: it is one tap and the address
+ * arrives already verified, so nobody has to fill this in if they would rather
+ * not. A Google account starts with no roles, so it lands on `/welcome` to pick
+ * them instead.
+ *
  * The first account becomes the studio owner and adopts projects saved before
  * accounts existed. The admin address is reserved and refused here — it signs in
- * with Google or a bootstrap code.
+ * with Google, its own password, or a bootstrap code.
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -18,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { GlassCard, GradientText, StatusPill, cn } from "@/components/ui/primitives";
 import { ApiError, api } from "@/lib/client/api";
+import { GoogleButton } from "@/components/auth/GoogleButton";
 import { ACCOUNT_ROLES, ROLE_DESCRIPTION, ROLE_LABEL } from "@/lib/roles";
 import type { AccountRole } from "@/lib/types";
 
@@ -136,6 +142,20 @@ export default function SignupPage() {
           </div>
         ) : (
           <form className="mt-3 space-y-3" onSubmit={submit}>
+            {/* Google: always a real button; a panel explains the one-time set-up. */}
+            <GoogleButton
+              className="mt-3"
+              configured={googleReady}
+              onUseEmail={() => {
+                const first = document.getElementById("name") as HTMLInputElement | null;
+                first?.focus();
+              }}
+            />
+            <div className="my-3 flex items-center gap-2 text-[9px] uppercase tracking-wider text-muted/50">
+              <span className="h-px flex-1 bg-white/10" /> or create one with email{" "}
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+
             {/* Roles */}
             <div>
               <div className="label mb-1">What do you do? Choose all that apply</div>

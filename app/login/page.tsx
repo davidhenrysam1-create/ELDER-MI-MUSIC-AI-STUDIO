@@ -4,22 +4,31 @@
  * Sign in.
  *
  * Three ways in, each shown honestly:
+ *  - **Continue with Google** — always a real, clickable button. It is a one-tap
+ *    sign-in as soon as `GOOGLE_CLIENT_ID` / `SECRET` exist, and until then it
+ *    opens the one-time set-up panel (`components/auth/GoogleButton.tsx`)
+ *    instead of pretending or sending anyone to a Google error page;
  *  - email + password for ordinary accounts;
- *  - **Continue with Google** only when `GOOGLE_CLIENT_ID` / `SECRET` exist
- *    (otherwise the button says "awaiting configuration" and does not pretend);
  *  - a one-time **admin bootstrap code** while Google is not configured yet, so
  *    the owner is never locked out of their own studio.
+ *
+ * It also detects the one failure that looks like a wrong password but is not:
+ * a browser that refuses to store the session cookie (a third-party iframe with
+ * strict cookie blocking). Sign-in succeeds, the cookie is dropped, and the
+ * next page bounces straight back here. Rather than looping silently we say so
+ * and offer a new tab, where the cookie is first-party.
  */
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { GlassCard, GradientText, StatusPill } from "@/components/ui/primitives";
 import { ApiError, api, type MeResponse } from "@/lib/client/api";
+import { GoogleButton } from "@/components/auth/GoogleButton";
 
 const GOOGLE_REASONS: Record<string, string> = {
   unconfigured:
-    "Google sign-in is not configured on this server yet. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then restart.",
+    "Google sign-in needs a one-time set-up on this server (see the panel below).",
   cancelled: "Google sign-in was cancelled.",
   state: "That sign-in attempt expired. Please try again.",
   unverified_email: "Your Google account's email address is not verified with Google.",
@@ -48,6 +57,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [config, setConfig] = useState<MeResponse | null>(null);
+  const [cookieBlocked, setCookieBlocked] = useState(false);
+  const emailRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     void api
@@ -56,12 +67,36 @@ function LoginForm() {
       .catch(() => undefined);
   }, []);
 
+  /**
+   * Was this page reached straight after a sign-in that *looked* successful?
+   *
+   * `submit()` records the moment it happens. If we are rendered again with a
+   * `?next=` (which only the middleware adds when it cannot see a session) and
+   * that record is seconds old, the browser threw the cookie away. Say it out
+   * loud instead of letting the person retype their password forever.
+   */
+  useEffect(() => {
+    try {
+      const at = Number(window.sessionStorage.getItem("eldermi_signed_in_at") ?? 0);
+      const fresh = at > 0 && Date.now() - at < 30_000;
+      if (fresh && params.get("next")) setCookieBlocked(true);
+      window.sessionStorage.removeItem("eldermi_signed_in_at");
+    } catch {
+      // sessionStorage can be blocked in a sandboxed frame; not worth an error.
+    }
+  }, [params]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     setBusy(true);
     try {
       const { user } = await api.login({ email, password });
+      try {
+        window.sessionStorage.setItem("eldermi_signed_in_at", String(Date.now()));
+      } catch {
+        // Ignored: the loop detector is a nicety, the sign-in itself succeeded.
+      }
       // Accounts without roles finish onboarding first.
       const target = (user.roles ?? []).length === 0 ? "/welcome" : nextPath;
       router.replace(target.startsWith("/") ? target : "/");
@@ -97,31 +132,37 @@ function LoginForm() {
           </StatusPill>
         </div>
 
-        {googleError ? (
+        {googleError && googleError !== "unconfigured" ? (
           <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/[0.08] px-2.5 py-2 text-[10px] leading-relaxed text-amber-100">
             {GOOGLE_REASONS[googleError] ?? "Google sign-in could not be completed."}
             {reasonParam ? ` ${decodeURIComponent(reasonParam)}` : ""}
           </p>
         ) : null}
 
-        {/* Google */}
-        <div className="mt-3">
-          {googleReady ? (
-            <a href={api.googleSignInUrl} className="btn-ghost w-full justify-center text-xs">
-              <Icon name="user" size={13} /> Continue with Google
-            </a>
-          ) : (
-            <div
-              className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-muted/70"
-              title={config?.google?.reason ?? "Checking configuration…"}
+        {/* Cookie refused by the browser — the one loop that is not a bad password. */}
+        {cookieBlocked ? (
+          <div className="mt-2 rounded-lg border border-rose-400/30 bg-rose-500/[0.08] px-2.5 py-2 text-[10px] leading-relaxed text-rose-100">
+            <span className="font-semibold">Your browser did not keep the sign-in.</span> This page
+            is inside another site&apos;s frame, and the browser refused the session cookie.{" "}
+            <a
+              href={nextPath}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="font-semibold text-white underline"
             >
-              <Icon name="user" size={13} /> Continue with Google
-              <span className="rounded border border-amber-400/30 px-1 py-0.5 text-[8px] uppercase tracking-wide text-amber-200">
-                awaiting configuration
-              </span>
-            </div>
-          )}
-        </div>
+              Open the studio in its own tab
+            </a>{" "}
+            and sign in there — that fixes it.
+          </div>
+        ) : null}
+
+        {/* Google: always a real button; a panel explains the one-time set-up. */}
+        <GoogleButton
+          className="mt-3"
+          configured={googleReady}
+          defaultOpen={googleError === "unconfigured"}
+          onUseEmail={() => emailRef.current?.focus()}
+        />
 
         <div className="my-3 flex items-center gap-2 text-[9px] uppercase tracking-wider text-muted/50">
           <span className="h-px flex-1 bg-white/10" /> or use email <span className="h-px flex-1 bg-white/10" />
@@ -134,6 +175,7 @@ function LoginForm() {
             </label>
             <input
               id="email"
+              ref={emailRef}
               type="email"
               className="field text-xs"
               autoComplete="email"

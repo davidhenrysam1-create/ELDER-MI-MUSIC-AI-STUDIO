@@ -6,7 +6,12 @@ import { NextResponse, type NextRequest } from "next/server";
  * 1. **Optional studio password** (`STUDIO_PASSWORD`) — HTTP Basic auth for the
  *    whole deployment. Unchanged from earlier versions: leave it unset for a
  *    local studio.
- * 2. **Account session** — every studio page and API route needs a signed-in
+ * 2. **Cross-site write guard** — the session cookie is `SameSite=None` when the
+ *    studio is served over HTTPS (see `lib/server/cookies.ts`), which is what
+ *    lets sign-in work inside an embedded preview. `None` cookies *are* sent on
+ *    cross-site requests, so anything that changes state must prove it came from
+ *    our own origin.
+ * 3. **Account session** — every studio page and API route needs a signed-in
  *    account. This middleware only checks that the session *cookie exists*
  *    (edge runtime cannot read the JSON store); the real validation, expiry
  *    check and ownership scoping happen in `lib/server/auth.ts` and each route
@@ -71,6 +76,50 @@ function basicAuthOk(request: NextRequest): boolean {
   return safeEqual(user, expectedUser) && safeEqual(supplied, password);
 }
 
+/** Methods that change state and therefore need an origin check. */
+const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Reject a write that a *different site* initiated.
+ *
+ * The browser sets `Origin` on every fetch and form POST. A same-origin write
+ * carries our own host there; a cross-site one carries the attacker's, so a
+ * plain `curl` without an Origin header (or a same-origin CLI call) is still
+ * allowed — nothing is gained by blocking requests that carry no cookies.
+ */
+export function crossSiteWrite(request: NextRequest): boolean {
+  if (!MUTATING.has(request.method.toUpperCase())) return false;
+
+  /*
+   * `Sec-Fetch-Site` is the browser's own statement about who started the
+   * request, and it compares the initiator with the *target as the browser sees
+   * it* — so it stays correct even when a proxy rewrites `Host` (which is exactly
+   * the embedded-preview case). Prefer it when present: `same-origin` and
+   * `same-site` are fine, `cross-site` is not, and `none` means a direct
+   * navigation (a form post from an address typed by the user).
+   */
+  const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase();
+  if (fetchSite === "cross-site") return true;
+  if (fetchSite === "same-origin" || fetchSite === "same-site" || fetchSite === "none") return false;
+
+  const origin = request.headers.get("origin");
+  if (!origin) return false; // same-origin navigations older than Origin support
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host.toLowerCase();
+  } catch {
+    return true; // unparseable Origin: treat as hostile
+  }
+  const candidates = [
+    request.headers.get("x-forwarded-host"),
+    request.headers.get("host"),
+    request.nextUrl.host,
+  ]
+    .map((value) => value?.split(",")[0]?.trim().toLowerCase())
+    .filter(Boolean);
+  return !candidates.includes(originHost);
+}
+
 function isPublic(pathname: string): boolean {
   if (PUBLIC_FILES.includes(pathname)) return true;
   if (pathname.startsWith("/icons/")) return true;
@@ -88,6 +137,18 @@ export function middleware(request: NextRequest) {
         "WWW-Authenticate": 'Basic realm="Elder Mi Music AI Studio", charset="UTF-8"',
         "Cache-Control": "no-store",
       },
+    });
+  }
+
+  if (crossSiteWrite(request)) {
+    const message =
+      "This request came from another site, so it was refused. Open the studio in its own tab and try again.";
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+    return new NextResponse(message, {
+      status: 403,
+      headers: { "Cache-Control": "no-store" },
     });
   }
 

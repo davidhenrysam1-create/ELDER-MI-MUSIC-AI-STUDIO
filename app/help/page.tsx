@@ -154,6 +154,10 @@ const FAQ: { q: string; a: string }[] = [
     a: "Your account is set to Artist or Promoter. Roles decide the dashboard: artists get Sam Vocal Studio plus publishing tools, promoters get publishing and promotion only, producers and engineers get all three studios. Change it in My account → What you do here, or ask the admin — the change applies on your next page load. The server enforces the same rules, so a hidden screen is also refused, never silently empty.",
   },
   {
+    q: "I sign in and it takes me straight back to the login screen.",
+    a: "That is the browser refusing the session cookie, not a wrong password — the sign-in itself succeeded. It usually happens when the studio is shown inside another site's frame (a preview panel) and that browser blocks third-party cookies. The studio handles it two ways: over HTTPS it sets the cookie SameSite=None; Secure; Partitioned so a framed preview can hold a session, and if the browser still refuses, the sign-in screen tells you so and offers Open the studio in its own tab. Use that link (or open the preview address in a new tab) and sign in there.",
+  },
+  {
     q: "How do I sign in as the studio admin?",
     a: "The simplest way is email and password: set ADMIN_PASSWORD in .env.local (8+ characters), restart the studio, then sign in at /login with your ADMIN_EMAIL address and that password. The setup password is only a way back in — change it in My account once you are inside, and the admin console banner will disappear. The other two routes are Continue with Google with the ADMIN_EMAIL address (once GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET exist) and the one-time bootstrap code printed in the terminal, entered at /admin-bootstrap (single use, 24 hours). No admin password is stored in the repository, and the admin can never be suspended or deleted from the console.",
   },
@@ -162,8 +166,8 @@ const FAQ: { q: string; a: string }[] = [
     a: "Open /admin (only the admin sees the link). It lists every account with its roles, sign-in method, verification, project count, files, storage and live share links. From there the admin can change roles, mark an address verified by hand, suspend an account (which blocks sign-in and ends its sessions immediately, without deleting its work) or delete it along with its projects, audio, exports and share links.",
   },
   {
-    q: "I clicked Continue with Google and nothing happened.",
-    a: "The button only appears as a working link when Google is configured; otherwise it reads awaiting configuration and explains the two variables it needs. To enable it, create an OAuth client in Google Cloud Console, add <your address>/api/auth/google/callback as an authorised redirect URI, put the client id and secret in .env.local and restart. Nothing is faked while it is off.",
+    q: "I clicked Continue with Google — what do I do now?",
+    a: "The button is always live. If Google is already configured, one tap signs you in (a new account picks its roles at /welcome). If it is not configured yet, clicking it opens a short set-up panel inside the sign-in card: it shows the exact redirect URI to paste into Google Cloud Console, a copy button, and where to put GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET. Nothing is sent to Google and no account is created until those two values exist. Email and password keep working in the meantime.",
   },
   {
     q: "How do I add a bandmate or a friend as a user?",
