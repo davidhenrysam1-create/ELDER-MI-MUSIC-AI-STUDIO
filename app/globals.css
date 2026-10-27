@@ -266,6 +266,136 @@ input[type="range"].accent-orange::-webkit-slider-thumb {
   mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
 }
 
+
+/* --------------------------------------------------------------- */
+/* Device adaptation (phone / tablet / laptop / desktop)            */
+/* --------------------------------------------------------------- */
+
+html {
+  /* iPhone/iPad: stop Safari from inflating text in landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Smooth anchor + programmatic scrolling without hijacking the page. */
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Dynamic viewport units keep the layout correct behind mobile toolbars. */
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+/* Notch and gesture-bar aware padding for fixed chrome. */
+.safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+.safe-top {
+  padding-top: max(0px, env(safe-area-inset-top));
+}
+.safe-x {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* Horizontal swipe area for the mixer and wide tables. */
+.scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+.scroll-x > * {
+  scroll-snap-align: start;
+}
+
+/* Fluid display sizes: readable at 320px, bold on a 4K monitor. */
+.text-fluid-hero {
+  font-size: clamp(1.55rem, 1.1rem + 2.4vw, 2.75rem);
+  line-height: 1.08;
+}
+.text-fluid-title {
+  font-size: clamp(1.25rem, 1.05rem + 1vw, 1.75rem);
+  line-height: 1.15;
+}
+
+/* iOS zooms the page when a focused field is under 16px: keep fields at 16px
+   on touch-sized screens instead of shrinking them. */
+@media (max-width: 640px) {
+  .field,
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  /* Comfortable tap targets on phones. */
+  .btn {
+    min-height: 40px;
+  }
+}
+
+/* Touch devices get larger slider thumbs and a taller hit area. */
+@media (pointer: coarse) {
+  input[type="range"] {
+    height: 34px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    height: 22px;
+    width: 22px;
+    margin-top: -8.5px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    height: 22px;
+    width: 22px;
+  }
+  /* Icon-only controls must stay tappable (44px minimum target). */
+  button[aria-label] {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* Very wide monitors: keep line lengths readable by widening the shell, not
+   the paragraphs. */
+@media (min-width: 1800px) {
+  .studio-shell {
+    max-width: 1680px;
+  }
+}
+
+/* Landscape phones are short: compact the fixed player so it does not cover
+   the console. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .player-shell {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+  .player-meta {
+    display: none;
+  }
+}
+
+/* Print (e.g. a mastering technical report) — keep it legible on paper. */
+@media print {
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .glass,
+  .glass-strong,
+  .glass-panel {
+    border: 1px solid #ddd !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -125,7 +125,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
   const storageCap = 2 * 1024 * 1024 * 1024;
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-dvh">
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
         <div className="absolute left-[8%] top-[-6rem] h-72 w-72 rounded-full bg-violet/20 blur-[100px] animate-floaty" />
         <div className="absolute right-[6%] top-24 h-64 w-64 rounded-full bg-cyan/10 blur-[90px]" />
@@ -179,7 +179,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
 
       <div className="lg:pl-[268px]">
         <TopBar onOpenMenu={() => setMobileOpen(true)} />
-        <main className="mx-auto w-full max-w-[1400px] px-4 pb-44 pt-4 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-[1400px] px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-8 3xl:max-w-[1680px]">
           {children}
         </main>
       </div>
@@ -192,6 +192,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
 
 function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { projects, project, saveState, savedAt, selectProject, settings } = useStudio();
+  const pathname = usePathname();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const jobs = project?.jobs ?? [];
   const attention = jobs.filter((j) => j.status === "failed").length;
@@ -208,8 +209,8 @@ function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
             : "Not saved yet";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-[#090914]/75 backdrop-blur-2xl">
-      <div className="mx-auto flex w-full max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+    <header className="safe-top sticky top-0 z-20 border-b border-white/[0.07] bg-[#090914]/75 backdrop-blur-2xl">
+      <div className="mx-auto flex w-full max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8 3xl:max-w-[1680px]">
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-muted lg:hidden"
@@ -330,6 +331,27 @@ function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
             </span>
           </div>
         </div>
+      </div>
+      <div className="scroll-x flex items-center gap-1.5 border-t border-white/[0.05] px-3 py-1.5 lg:hidden">
+        {NAV.filter((item) => item.studio || item.href === "/").map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-semibold transition-colors",
+                active
+                  ? "border-white/25 bg-white/10 text-softwhite"
+                  : "border-white/10 bg-white/[0.03] text-muted",
+              )}
+            >
+              <Icon name={item.icon} size={11} />
+              {item.label.replace("Sam ", "").replace(" Studio", "")}
+            </Link>
+          );
+        })}
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-white/[0.05] px-4 py-1.5 lg:hidden">
         <select

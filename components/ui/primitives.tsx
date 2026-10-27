@@ -480,7 +480,7 @@ export function Modal({
   const width = size === "sm" ? "max-w-md" : size === "lg" ? "max-w-3xl" : "max-w-xl";
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 pb-[env(safe-area-inset-bottom)] xs:p-3 sm:items-center sm:p-6">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
@@ -493,11 +493,11 @@ export function Modal({
         aria-label={title}
         tabIndex={-1}
         className={cn(
-          "glass-strong animate-rise relative z-10 w-full overflow-hidden rounded-2xl outline-none",
+          "glass-strong animate-rise relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl outline-none xs:rounded-2xl sm:max-h-[88dvh]",
           width,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-4 py-4 sm:px-5">
           <div>
             <h3 className="text-base font-semibold text-softwhite">{title}</h3>
             {description ? (
@@ -512,9 +512,9 @@ export function Modal({
             <Icon name="x" size={16} />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">{children}</div>
         {footer ? (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-white/10 bg-black/20 px-5 py-3">
+          <div className="safe-bottom flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-white/10 bg-black/20 px-4 py-3 sm:px-5">
             {footer}
           </div>
         ) : null}

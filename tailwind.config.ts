@@ -8,6 +8,14 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Phone-first: the studios are usable from 320px up, and dense panels
+      // only split into columns once there is genuinely room.
+      screens: {
+        xs: "400px",
+        "3xl": "1800px",
+        short: { raw: "(max-height: 720px)" },
+        coarse: { raw: "(pointer: coarse)" },
+      },
       colors: {
         midnight: "#090914",
         indigoDeep: "#15112B",

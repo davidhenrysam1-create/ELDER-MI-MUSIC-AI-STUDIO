@@ -9,6 +9,31 @@ const nextConfig = {
     serverActions: { bodySizeLimit: "90mb" },
   },
   eslint: { ignoreDuringBuilds: true },
+  async headers() {
+    return [
+      {
+        // The service worker must never be served from a stale cache, and it
+        // needs to be allowed to control the whole origin.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+      {
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600" },
+          { key: "Content-Type", value: "application/manifest+json" },
+        ],
+      },
+      {
+        source: "/icons/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

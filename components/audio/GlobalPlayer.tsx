@@ -26,8 +26,8 @@ export function GlobalPlayer() {
   const gainActive = Math.abs(player.gainDb) > 0.05;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 px-2 pb-2 sm:px-4 sm:pb-3">
-      <div className="glass-strong mx-auto flex w-full max-w-[1400px] flex-col gap-2 rounded-xl px-3 py-2.5">
+    <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 px-2 sm:px-4">
+      <div className="player-shell glass-strong mx-auto flex w-full max-w-[1400px] flex-col gap-2 rounded-xl px-3 py-2.5 3xl:max-w-[1680px]">
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
@@ -88,7 +88,7 @@ export function GlobalPlayer() {
                   <div className="h-[22px] rounded bg-white/[0.04]" aria-hidden />
                 )}
               </div>
-              <label className="hidden items-center gap-1.5 md:flex">
+              <label className="hidden items-center gap-1.5 lg:flex">
                 <Icon name="headphones" size={12} className="text-muted" />
                 <input
                   type="range"
@@ -141,7 +141,7 @@ export function GlobalPlayer() {
             ) : null}
           </div>
         </div>
-        <div className="hidden items-center justify-between px-1 text-[9px] uppercase tracking-[0.16em] text-muted/60 sm:flex">
+        <div className="player-meta hidden items-center justify-between px-1 text-[9px] uppercase tracking-[0.16em] text-muted/60 sm:flex">
           <span>Elder Mi Music AI Studio · Web Audio engine</span>
           <span className="mono">
             {(project?.assets.find((a) => a.id === player.assetId)?.sampleRate ?? 48000) / 1000} kHz ·{" "}

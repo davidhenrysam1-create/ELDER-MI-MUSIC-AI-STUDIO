@@ -630,7 +630,7 @@ function MixStudio() {
               ))}
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            <div className="scroll-x -mx-1 flex gap-2 px-1 pb-2">
               {tracks.map((track) => {
                 const asset = project.assets.find((a) => a.id === track.assetId) ?? null;
                 const group = mix.groups.find((g) => g.id === (track.groupId ?? groupForRole(track.role)));
@@ -666,7 +666,7 @@ function MixStudio() {
                       value={selected.name}
                       onChange={(e) => updateTrack(selected.id, { name: e.target.value })}
                       aria-label="Channel name"
-                      className="w-40 border-none bg-transparent text-sm font-semibold text-softwhite focus:outline-none"
+                      className="w-full min-w-0 max-w-[10rem] border-none bg-transparent text-sm font-semibold text-softwhite focus:outline-none"
                     />
                     <StatusPill tone="neutral">{STEM_ROLE_LABEL[selected.role]}</StatusPill>
                     {project.assets.find((a) => a.id === selected.assetId) ? (

@@ -179,7 +179,7 @@ export default function HelpPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
+          <h1 className="text-fluid-title font-display font-bold tracking-tight">
             <GradientText>Help &amp; DAW import</GradientText>
           </h1>
           <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted">
@@ -327,6 +327,48 @@ export default function HelpPage() {
           </div>
         </GlassCard>
       </div>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-softwhite">
+            <Icon name="grid" size={15} className="text-violet-300" />
+            Run it on your phone, tablet or laptop
+          </h2>
+          <StatusPill tone="success" icon="check">
+            Works at any screen size
+          </StatusPill>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              title: "Android phone or tablet",
+              body: "Open in Chrome, then menu → Install app. It opens full-screen with its own icon and keeps the shell available offline.",
+            },
+            {
+              title: "iPhone / iPad",
+              body: "Open in Safari → Share → Add to Home Screen. Full-screen studio, notch-safe bars and 16px fields so iOS never zooms.",
+            },
+            {
+              title: "Laptop or desktop",
+              body: "Use it in any modern browser, or install it from the address-bar icon. The layout widens to 1800px+ on large monitors.",
+            },
+            {
+              title: "On your local network",
+              body: "The dev server listens on 0.0.0.0:3000, so other devices can open http://<your-computer-ip>:3000 on the same Wi-Fi.",
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div className="text-[11px] font-semibold text-softwhite">{item.title}</div>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted">{item.body}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-[10px] leading-relaxed text-muted/70">
+          Rendering happens on the device you are using: a laptop bounces a long mix faster than an
+          older phone. Trim the render section in Sam Vocal Studio, and press play once on iOS before
+          expecting monitoring — Safari requires a tap before audio is allowed.
+        </p>
+      </GlassCard>
 
       <GlassCard>
         <h2 className="text-base font-semibold text-softwhite">Workflow cheat sheet</h2>

@@ -64,7 +64,7 @@ export default function ProjectsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
+          <h1 className="text-fluid-title font-display font-bold tracking-tight">
             <GradientText>My Projects</GradientText>
           </h1>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted">

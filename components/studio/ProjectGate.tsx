@@ -35,7 +35,7 @@ export function StudioHeader({
           <Icon name={icon} size={20} />
         </span>
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
+          <h1 className="text-fluid-title font-display font-bold tracking-tight">
             <GradientText variant={variant}>{title}</GradientText>
           </h1>
           <p className="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">{tagline}</p>

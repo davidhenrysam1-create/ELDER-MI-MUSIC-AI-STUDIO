@@ -133,7 +133,21 @@ verification. Solo logic is explicit (any solo → only soloed channels).
 - Design tokens live in `tailwind.config.ts` and `app/globals.css` (glass surfaces, gradients,
   focus rings, reduced-motion support).
 
-## 8. Known trade-offs
+## 8. Multi-device delivery
+
+One codebase serves every screen size; there is no separate mobile build.
+
+| Layer | Implementation |
+| --- | --- |
+| Layout | Phone-first Tailwind breakpoints (`xs` 400, `sm` 640, `md` 768, `lg` 1024, `xl` 1280, `3xl` 1800) plus `short`/`coarse` media variants. Sidebar becomes a drawer below `lg`; studios get a compact tab bar. |
+| Viewport | `width=device-width`, `viewport-fit=cover`, `100dvh` shell, `env(safe-area-inset-*)` padding on the player, top bar and modal footers. |
+| Touch | 16px form fields on `<=640px` (prevents iOS focus zoom), 34px slider tracks and 22px thumbs on `pointer: coarse`, waveform seek uses `touch-action: none` + pointer capture. |
+| Overflow | Mixer strips scroll horizontally with snap points (`.scroll-x`), tables scroll inside their panels, modals become bottom sheets with an internally scrolling body. |
+| Install | `app/manifest.ts` (standalone, any orientation, maskable icon, three studio shortcuts), `app/apple-icon.png`, Next-generated `/icon.png`, and `components/pwa/PwaBridge.tsx` handling `beforeinstallprompt` plus the iOS Share-sheet instructions. |
+| Offline | `public/sw.js` precaches the shell, caches static assets cache-first with background refresh, is network-first for navigations with a cached/`/offline` fallback, and deliberately never caches `/api/*` or audio (stale + privacy). Registered only in production builds. |
+| Print | Light print stylesheet for reports and capability tables. |
+
+## 9. Known trade-offs
 
 - Granular pitch shifting is not a phase vocoder; extreme shifts sound artefacty. Acceptable for
   doubles/choir support layers and disclosed in the docs.
@@ -142,5 +156,7 @@ verification. Solo logic is explicit (any solo → only soloed channels).
   worker-pooled yet.
 - Single-operator storage: `.data` on disk. Multi-tenant hosting requires swapping the repository
   layer.
+- Rendering happens on the client device, so a phone is slower than a laptop for long bounces; the
+  render section selector exists for that.
 - Access control is a single optional Basic-auth gate (`STUDIO_PASSWORD`). It is not a user system:
   no roles, sessions, per-user libraries or audit trail.

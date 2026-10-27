@@ -100,7 +100,7 @@ export default function DashboardPage() {
             </StatusPill>
           </div>
 
-          <h1 className="mt-4 max-w-3xl font-display text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-[40px]">
+          <h1 className="text-fluid-hero mt-4 max-w-3xl font-display font-extrabold tracking-tight">
             <GradientText>Welcome to Elder Mi Music AI Studio</GradientText>
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">

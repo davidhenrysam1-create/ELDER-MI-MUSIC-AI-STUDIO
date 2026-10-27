@@ -104,7 +104,7 @@ export function Waveform({
     <div
       ref={wrapRef}
       className={`relative w-full ${onSeek ? "cursor-pointer" : ""} ${className ?? ""}`}
-      style={{ height }}
+      style={{ height, touchAction: onSeek ? "none" : undefined }}
       role={onSeek ? "slider" : "img"}
       aria-label={ariaLabel}
       aria-valuenow={onSeek ? Math.round(progress * 100) : undefined}
@@ -126,6 +126,9 @@ export function Waveform({
         if (draggingRef.current) seekFromEvent(e.clientX);
       }}
       onPointerUp={() => {
+        draggingRef.current = false;
+      }}
+      onPointerCancel={() => {
         draggingRef.current = false;
       }}
     >

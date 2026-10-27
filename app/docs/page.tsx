@@ -39,7 +39,7 @@ export default function DocsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
+          <h1 className="text-fluid-title font-display font-bold tracking-tight">
             <GradientText>Studio documentation</GradientText>
           </h1>
           <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted">
@@ -239,6 +239,35 @@ export default function DocsPage() {
       </GlassCard>
 
       <GlassCard>
+        <h2 className="text-base font-semibold text-softwhite">Devices, installation &amp; offline</h2>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {[
+            {
+              title: "Install it",
+              body: "Android/desktop: install from the browser prompt. iOS: Safari → Share → Add to Home Screen. Installed it opens full-screen from /manifest.webmanifest.",
+            },
+            {
+              title: "Any screen",
+              body: "Phone-first layout from 320px to 4K: drawer navigation and a compact workspace bar on phones, safe-area padding for notches, bottom-sheet dialogs, horizontal mixer scrolling.",
+            },
+            {
+              title: "Offline shell",
+              body: "A service worker caches the app shell and icons only. API responses and audio are never cached — offline navigations land on an honest /offline page.",
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div className="text-[11px] font-semibold text-softwhite">{item.title}</div>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted">{item.body}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-[10px] leading-relaxed text-muted/70">
+          Rendering and measurement use the Web Audio API on the device, so a laptop outpaces a phone
+          on long files. Icons are generated with <span className="mono">node scripts/generate-icons.mjs</span>.
+        </p>
+      </GlassCard>
+
+      <GlassCard>
         <h2 className="text-base font-semibold text-softwhite">Architecture</h2>
         <pre className="mt-2 overflow-x-auto rounded-xl border border-white/10 bg-black/40 p-3 text-[10px] leading-relaxed text-muted">
 {`Browser (Next.js client)                       Studio server (Next.js route handlers)
@@ -282,7 +311,7 @@ Prompt + recommendations  ──────────────────
       <GlassCard>
         <h2 className="text-base font-semibold text-softwhite">Capability matrix</h2>
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[680px] border-collapse text-left text-[11px]">
+          <table className="w-full min-w-[640px] border-collapse text-left text-[11px]">
             <thead>
               <tr className="border-b border-white/10 text-[9px] uppercase tracking-wider text-muted">
                 <th className="py-2 pr-2">Capability</th>
