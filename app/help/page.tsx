@@ -114,6 +114,10 @@ const DAW_GUIDES: { id: string; name: string; tint: string; steps: Step[] }[] = 
 
 const FAQ: { q: string; a: string }[] = [
   {
+    q: "Do I need an account to use the studio?",
+    a: "No. This build runs in open studio mode: opening the address takes you straight to the dashboard, and every studio, project, export, share link, public page and the admin console are already there. The app acts as the studio owner account (ADMIN_EMAIL) — created automatically with all four roles — so publishing, likes, follows and downloads work immediately. The sign-in and sign-up screens forward to the dashboard, and Sign out is hidden. If the owner wants separate libraries again, they set STUDIO_ACCOUNTS=on and restart: the login screens return and nothing is lost.",
+  },
+  {
     q: "Why does the vocal tool say “Needs configuration”?",
     a: "Neural voice transformation requires a licensed provider and recorded consent. The studio will not run a placeholder model or play back your original file as if it were converted. Every other vocal tool (chorus, harmony, ad-lib, doubling, backing vocals, choir stacks) uses real DSP on your own recording and is available now.",
   },

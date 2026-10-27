@@ -215,7 +215,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { settings, system, notify, user, signOut } = useStudio();
+  const { settings, system, notify, user, signOut, openStudio } = useStudio();
 
   useEffect(() => {
     setMobileOpen(false);
@@ -285,15 +285,19 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
               href="/account"
               className="flex-1 rounded-lg border border-white/10 py-1 text-center text-[10px] text-muted transition-colors hover:text-softwhite"
             >
-              Account
+              {openStudio ? "Studio profile" : "Account"}
             </Link>
-            <button
-              type="button"
-              onClick={() => void signOut?.()}
-              className="flex-1 rounded-lg border border-white/10 py-1 text-[10px] text-muted transition-colors hover:text-rose-200"
-            >
-              Sign out
-            </button>
+            {/* An open studio has no login screen, so signing out would be a door
+                into a wall: the button is simply not shown. */}
+            {openStudio ? null : (
+              <button
+                type="button"
+                onClick={() => void signOut?.()}
+                className="flex-1 rounded-lg border border-white/10 py-1 text-[10px] text-muted transition-colors hover:text-rose-200"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </div>
         <div className="mt-3 space-y-3 rounded-xl border border-white/10 bg-black/25 p-3">

@@ -351,6 +351,29 @@ export default function DocsPage() {
 
       <GlassCard>
         <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-base font-semibold text-softwhite">Open studio mode</h2>
+          <StatusPill tone="success" icon="lock">
+            Implemented
+          </StatusPill>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          This build has <span className="text-softwhite">no sign-in screen</span>. Opening the app acts
+          as the studio owner account (<span className="mono">ADMIN_EMAIL</span>), created automatically
+          with all four roles and a public handle, so every studio, project, share link, public page and
+          the admin console are reachable immediately — and publishing, likes, follows and downloads all
+          have a real account behind them. <span className="mono">/login</span>,{" "}
+          <span className="mono">/signup</span>, <span className="mono">/admin-bootstrap</span> and{" "}
+          <span className="mono">/welcome</span> forward to the dashboard, and Sign out is hidden.
+        </p>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+          To return to per-person accounts, set <span className="mono">STUDIO_ACCOUNTS=on</span> and
+          restart. The login screen, sign-up and private libraries come back exactly as described below,
+          and no account, project or share link is deleted in either direction.
+        </p>
+      </GlassCard>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <h2 className="text-base font-semibold text-softwhite">Publishing, likes and follows</h2>
           <StatusPill tone="success" icon="music">
             Implemented

@@ -221,7 +221,9 @@ function toPublic(raw: User): PublicUser {
   const user = normalizeUser(raw);
   const { passwordHash: _passwordHash, verifyTokenHash: _verifyTokenHash, ...rest } = user;
   // The stored flag is never trusted on its own: it is recomputed from ADMIN_EMAIL.
-  return { ...rest, isAdmin: isAdminEmail(user.email) };
+  // In an open studio the acting account is the owner, so the console is theirs.
+  const isOpenOwner = openStudioMode() && user.email === openStudioOwnerEmail();
+  return { ...rest, isAdmin: isAdminEmail(user.email) || isOpenOwner };
 }
 
 /** Throw when an admin suspended the account. */
@@ -652,9 +654,89 @@ async function clearSessionCookie(): Promise<void> {
   });
 }
 
+/* ------------------------------------------------------------------ */
+/* Open studio mode                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * True when the studio opens straight into its tools.
+ *
+ * The owner asked for a studio where nothing sits behind a sign-in screen: open
+ * the address and every studio, project, share link and the admin console are
+ * simply there. That is the default for this build (`STUDIO_ACCOUNTS` unset).
+ *
+ * Set `STUDIO_ACCOUNTS=on` to bring back the login screen, separate personal
+ * libraries and sign-up. No account, password, session or project is deleted in
+ * either direction — the whole accounts system stays in the codebase and keeps
+ * working the moment that variable is set.
+ */
+export function openStudioMode(): boolean {
+  return (process.env.STUDIO_ACCOUNTS ?? "").trim().toLowerCase() !== "on";
+}
+
+/** Address of the account an open studio acts as (the admin when configured). */
+function openStudioOwnerEmail(): string {
+  return adminEmail() ?? "studio@elder-mi.local";
+}
+
+/**
+ * The single account an open studio acts as.
+ *
+ * Created once, with every role and a public handle, so publishing, likes,
+ * follows, downloads, share links and the admin console all have a real owner
+ * to attribute work to — nothing is faked as "anonymous". Projects saved before
+ * accounts existed are claimed at the same moment.
+ */
+export async function openStudioOwner(): Promise<PublicUser> {
+  const email = openStudioOwnerEmail();
+  const existing = (await readDb()).users.find((user) => user.email === email);
+  if (existing) return toPublic(existing);
+
+  const created = await mutateDb((state) => {
+    const already = state.users.find((user) => user.email === email);
+    if (already) return already;
+
+    // A handle is required to publish; "studio" is the natural first choice.
+    let handle = "studio";
+    for (let suffix = 2; state.users.some((user) => user.handle === handle); suffix += 1) {
+      handle = `studio${suffix}`;
+    }
+
+    const user: User = {
+      id: `usr_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
+      email,
+      name: "Studio owner",
+      passwordHash: "",
+      role: "owner",
+      // Every role at once, so each dashboard and every studio is usable.
+      roles: [...ACCOUNT_ROLES],
+      handle,
+      bio: "",
+      links: emptyLinks(),
+      isAdmin: true,
+      emailVerified: true,
+      provider: "password",
+      googleSub: null,
+      suspendedAt: null,
+      suspendedReason: null,
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+    state.users.push(user);
+    claimOrphans(state, user.id);
+    return user;
+  });
+
+  return toPublic(created);
+}
+
 /** Read the signed-in account, or null. Never throws for a missing cookie. */
 export async function currentUser(): Promise<PublicUser | null> {
   if (sessionOverride) return sessionOverride();
+  // Open studio: there is nobody to sign in as — every request acts as the
+  // studio owner, so no screen ever asks for a password.
+  if (openStudioMode()) return openStudioOwner();
+
   const store = await cookieStore();
   const token = store?.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -709,7 +791,7 @@ export async function guard(): Promise<
 /** Signed-in account that is also the studio admin, or a 403. */
 export async function requireAdmin(): Promise<PublicUser> {
   const user = await requireUser();
-  if (!isAdminEmail(user.email)) {
+  if (!user.isAdmin) {
     throw new AuthError("Only the studio admin can open that.", 403);
   }
   return user;

@@ -11,14 +11,17 @@ import { NextResponse, type NextRequest } from "next/server";
  *    lets sign-in work inside an embedded preview. `None` cookies *are* sent on
  *    cross-site requests, so anything that changes state must prove it came from
  *    our own origin.
- * 3. **Account session** — every studio page and API route needs a signed-in
- *    account. This middleware only checks that the session *cookie exists*
- *    (edge runtime cannot read the JSON store); the real validation, expiry
- *    check and ownership scoping happen in `lib/server/auth.ts` and each route
- *    handler. A forged cookie therefore gets a `401`, not access.
+ * 3. **Account session** — off by default. This build runs in *open studio*
+ *    mode: there is no sign-in screen and every page is reachable, acting as
+ *    the studio owner account (`lib/server/auth.ts`). Only when
+ *    `STUDIO_ACCOUNTS=on` does the studio go back to per-person accounts, and
+ *    then this middleware checks that a session *cookie exists* (the edge
+ *    runtime cannot read the JSON store). Real validation, expiry and ownership
+ *    scoping always happen in `lib/server/auth.ts` and each route handler, so a
+ *    forged cookie still gets a `401`, never access.
  *
- * Pages redirect to `/login?next=…`; API calls get a JSON `401` so the client
- * can react instead of parsing HTML.
+ * When accounts are on, pages redirect to `/login?next=…` and API calls get a
+ * JSON `401` so the client can react instead of parsing HTML.
  */
 
 /**
@@ -28,6 +31,11 @@ import { NextResponse, type NextRequest } from "next/server";
  *  - the PWA fallback.
  */
 const PUBLIC_PREFIXES = ["/login", "/signup", "/admin-bootstrap", "/s/", "/u/", "/offline"];
+/**
+ * Screens that only exist in accounts mode. In open mode they have nothing to
+ * do, so they forward to the dashboard instead of showing a login form.
+ */
+const SIGN_IN_PATHS = ["/login", "/signup", "/admin-bootstrap", "/welcome"];
 const PUBLIC_FILES = [
   "/manifest.webmanifest",
   "/sw.js",
@@ -120,6 +128,17 @@ export function crossSiteWrite(request: NextRequest): boolean {
   return !candidates.includes(originHost);
 }
 
+/**
+ * Are per-person accounts switched on?
+ *
+ * Unset (the default) means open studio: the app behaves as one shared studio
+ * with the owner account, and nothing asks anyone to sign in. `STUDIO_ACCOUNTS=on`
+ * restores logins, sign-up and private libraries.
+ */
+function accountsMode(): boolean {
+  return (process.env.STUDIO_ACCOUNTS ?? "").trim().toLowerCase() === "on";
+}
+
 function isPublic(pathname: string): boolean {
   if (PUBLIC_FILES.includes(pathname)) return true;
   if (pathname.startsWith("/icons/")) return true;
@@ -153,6 +172,17 @@ export function middleware(request: NextRequest) {
   }
 
   const { pathname, search } = request.nextUrl;
+
+  // Open studio (the default): no sign-in screen anywhere. Forwarding these
+  // paths home is what actually removes them from the app, rather than merely
+  // hiding the links — a typed /login still lands on the dashboard.
+  if (!accountsMode()) {
+    if (SIGN_IN_PATHS.includes(pathname)) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next();
+  }
+
   if (isPublic(pathname)) return NextResponse.next();
 
   const hasSession = Boolean(request.cookies.get("eldermi_session")?.value);

@@ -26,7 +26,14 @@ export const STATUS_LABEL: Record<CapabilityStatus, string> = {
 
 export const CAPABILITIES: Capability[] = [
   {
-    name: "Accounts, sign-in and per-account libraries",
+    name: "Open studio (no sign-in screen)",
+    area: "Platform",
+    status: "ready",
+    detail:
+      "Default mode: opening the app acts as the studio owner, so every studio, project, share link, public page and the admin console are reachable without signing in. Sign-in screens forward to the dashboard. Set STUDIO_ACCOUNTS=on to restore accounts and private libraries — no data is migrated or deleted either way.",
+  },
+  {
+    name: "Accounts, sign-in and per-account libraries (STUDIO_ACCOUNTS=on)",
     area: "Platform",
     status: "ready",
     detail:
