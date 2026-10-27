@@ -488,6 +488,11 @@ export interface User {
   isAdmin?: boolean;
   /** False until an email verification link is confirmed. */
   emailVerified?: boolean;
+  /**
+   * True while the admin still uses the setup password copied from
+   * `ADMIN_PASSWORD`. The admin console shows a banner until it is changed.
+   */
+  passwordSeeded?: boolean;
   /** SHA-256 of the current verification link token, and its expiry. */
   verifyTokenHash?: string | null;
   verifyExpiresAt?: string | null;

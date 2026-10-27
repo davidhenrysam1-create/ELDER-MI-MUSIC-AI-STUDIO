@@ -74,6 +74,7 @@ function LoginForm() {
 
   const googleReady = config?.google?.configured === true;
   const bootstrapAvailable = config?.adminSignIn?.bootstrapAvailable === true;
+  const adminPasswordReady = config?.adminSignIn?.passwordConfigured === true;
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
@@ -193,21 +194,31 @@ function LoginForm() {
           <div className="flex items-center gap-1.5 text-[10px] font-semibold text-softwhite">
             <Icon name="lock" size={11} className="text-amber-300" /> Studio admin
           </div>
+          {adminPasswordReady ? (
+            <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
+              Sign in above with the admin email and the password from{" "}
+              <span className="mono">ADMIN_PASSWORD</span>. Once you are in, change it in My account —
+              the setup password is only a way back in.
+            </p>
+          ) : null}
+
           {googleReady ? (
             <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
-              The admin account signs in with Google, using the address in{" "}
+              The admin account also signs in with Google, using the address in{" "}
               <span className="mono">ADMIN_EMAIL</span>.
             </p>
           ) : (
             <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
-              Google sign-in is not configured yet, so the admin uses a one-time bootstrap code.{" "}
+              Google sign-in is not configured yet, so besides a password the admin has a one-time
+              bootstrap code.{" "}
               {bootstrapAvailable ? (
                 <Link href="/admin-bootstrap" className="text-cyan-200 underline hover:text-white">
                   Enter the bootstrap code →
                 </Link>
               ) : (
                 <span>
-                  Set <span className="mono">ADMIN_EMAIL</span> and restart to generate one.
+                  No code is active right now — restart the server (or set{" "}
+                  <span className="mono">ADMIN_BOOTSTRAP_CODE</span>) to issue one.
                 </span>
               )}
             </p>

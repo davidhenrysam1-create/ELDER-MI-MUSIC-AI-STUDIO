@@ -244,11 +244,20 @@ sign-in method, verification state, project/file/storage counts and live share l
 
 The admin account itself cannot be suspended or deleted, so the studio cannot lock itself out.
 
-**Getting in as admin:** sign in with Google using the `ADMIN_EMAIL` address. While Google is not
-configured, start the app and read the one-time bootstrap code printed in the terminal, then enter it at
-`/admin-bootstrap` (single use, 24 hours; set `ADMIN_BOOTSTRAP_CODE` to choose your own). **No admin
-password is stored in this repository** — if a password was ever shared in chat, change it wherever it is
-used.
+**Getting in as admin** — three ways, in the order they become available:
+
+1. **Email + password** (easiest while Google is unconfigured). Put `ADMIN_PASSWORD` in `.env.local` and the
+   admin account adopts it on the next sign-in attempt, so `/login` works with your `ADMIN_EMAIL` address
+   and that password — across restarts. It seeds the stored scrypt hash **once**: change the password in
+   *My account* afterwards and the setup value stops working. The admin console shows a banner until you
+   do.
+2. **Continue with Google** using the `ADMIN_EMAIL` address, once `GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET` are set.
+3. **One-time bootstrap code** printed in the terminal at start-up, entered at `/admin-bootstrap`
+   (single use, 24 hours; set `ADMIN_BOOTSTRAP_CODE` to choose your own).
+
+**No admin password is stored in this repository.** `ADMIN_PASSWORD` lives in your git-ignored
+`.env.local`; treat it as a way back in, not as the long-term password.
 
 How it is stored: passwords are salted **scrypt** hashes (`scrypt$N$r$p$salt$hash`) in `db.json`;
 never plaintext, never sent to the browser. Sessions are a random 256-bit token in an `HttpOnly`,
@@ -330,6 +339,7 @@ Copy `.env.example` to `.env.local`:
 | `DATA_DIR` | Optional private data directory (default `./.data`). |
 | `ADMIN_EMAIL` | **Required for admin access.** The one address that always has admin rights. Leave it empty and nobody can open `/admin`. |
 | `ADMIN_BOOTSTRAP_CODE` | Optional. Fixed one-time admin code while Google is unconfigured; random and printed to the log if unset. |
+| `ADMIN_PASSWORD` | Optional (8+ chars). Seeds the admin's password once so `/login` works with `ADMIN_EMAIL` + this password; change it in My account afterwards. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Turns on **Continue with Google**. Add `/api/auth/google/callback` as an authorised redirect URI. |
 | `GOOGLE_REDIRECT_URI` | Optional. Pins the redirect URI when it differs from `NEXT_PUBLIC_SITE_URL`. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Optional. The only way verification emails are actually sent. Without them nothing is mailed and the UI says so. |
