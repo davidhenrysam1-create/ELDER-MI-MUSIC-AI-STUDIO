@@ -7,14 +7,18 @@
 
 /**
  * Screens that work without an account:
- *  - `/login`, `/signup` — the way in;
- *  - `/s/<token>`        — a friend's shared listening page;
- *  - `/offline`          — the service-worker fallback.
+ *  - `/login`, `/signup`     — the way in;
+ *  - `/admin-bootstrap`      — the one-time admin code, needed *before* a session;
+ *  - `/s/<token>`            — a friend's shared listening page;
+ *  - `/u/<handle>`           — a public profile and its published music;
+ *  - `/offline`              — the service-worker fallback.
  *
  * These render without the studio chrome and never fetch studio data.
+ * `/welcome` and `/admin` are **not** here: they need a session, so the shell's
+ * auth guard must run for them.
  */
-export const PUBLIC_PATHS = ["/login", "/signup", "/offline"] as const;
-export const PUBLIC_PREFIXES = ["/s/"] as const;
+export const PUBLIC_PATHS = ["/login", "/signup", "/admin-bootstrap", "/offline"] as const;
+export const PUBLIC_PREFIXES = ["/s/", "/u/"] as const;
 
 export function isPublicPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false;

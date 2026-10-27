@@ -436,10 +436,34 @@ export interface StudioSettings {
 }
 
 /**
+ * What someone does, chosen at sign-up or in the account screen.
+ *
+ * A person can hold several ("artist and producer"), which is why this is a
+ * list rather than a single enum. `lib/roles.ts` maps roles onto the screens and
+ * endpoints they may use — that file is the single source of truth for access.
+ */
+export type AccountRole = "artist" | "producer" | "engineer" | "promoter";
+
+/** Where the account's credentials come from. */
+export type AuthProvider = "password" | "google" | "bootstrap";
+
+/** Social platforms an account can link from its profile. */
+export interface ProfileLinks {
+  audiomack: string;
+  instagram: string;
+  facebook: string;
+}
+
+/**
  * A studio account.
  *
- * Accounts are local to this server: no third-party identity provider, no email
- * delivery. Passwords are stored only as salted scrypt hashes.
+ * Accounts are local to this server: no email delivery and no third-party
+ * identity provider unless you configure Google. Passwords are stored only as
+ * salted scrypt hashes.
+ *
+ * The `?`-optional fields were added with roles (database version 3) and are
+ * normalised by `normalizeUser()` in `lib/server/auth.ts`, so a record written by
+ * an older build keeps working.
  */
 export interface User {
   id: string;
@@ -450,6 +474,30 @@ export interface User {
   passwordHash: string;
   /** `owner` is the first account: it may promote the studio and claim old data. */
   role: "owner" | "member";
+  /** Artist / producer / engineer / promoter. Empty means "not chosen yet". */
+  roles?: AccountRole[];
+  /** Unique @handle used on profile pages. Null until the person picks one. */
+  handle?: string | null;
+  bio?: string;
+  /** Links shown on the profile. Empty strings mean "not set". */
+  links?: ProfileLinks;
+  /**
+   * True only for the account named by `ADMIN_EMAIL`. Set on sign-in/creation and
+   * never editable from the UI, so an ordinary member cannot promote themselves.
+   */
+  isAdmin?: boolean;
+  /** False until an email verification link is confirmed. */
+  emailVerified?: boolean;
+  /** SHA-256 of the current verification link token, and its expiry. */
+  verifyTokenHash?: string | null;
+  verifyExpiresAt?: string | null;
+  provider?: AuthProvider;
+  /** Google's stable subject id, when the account is linked to Google. */
+  googleSub?: string | null;
+  /** ISO timestamp when an admin suspended the account, else null. */
+  suspendedAt?: string | null;
+  /** Why the account was suspended, shown to the person when they try to sign in. */
+  suspendedReason?: string | null;
   createdAt: string;
   lastLoginAt: string | null;
 }

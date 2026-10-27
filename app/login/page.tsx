@@ -3,21 +3,30 @@
 /**
  * Sign in.
  *
- * Deliberately a plain form: email + password, nothing to configure. Errors are
- * shown from the server's own wording. On success the browser returns to the
- * page it was heading for (`?next=`), defaulting to the dashboard.
+ * Three ways in, each shown honestly:
+ *  - email + password for ordinary accounts;
+ *  - **Continue with Google** only when `GOOGLE_CLIENT_ID` / `SECRET` exist
+ *    (otherwise the button says "awaiting configuration" and does not pretend);
+ *  - a one-time **admin bootstrap code** while Google is not configured yet, so
+ *    the owner is never locked out of their own studio.
  */
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { GlassCard, GradientText, StatusPill } from "@/components/ui/primitives";
-import { ApiError, api } from "@/lib/client/api";
+import { ApiError, api, type MeResponse } from "@/lib/client/api";
 
-/**
- * `useSearchParams()` forces client-side rendering, so the form lives inside a
- * Suspense boundary; the fallback is the same card without data.
- */
+const GOOGLE_REASONS: Record<string, string> = {
+  unconfigured:
+    "Google sign-in is not configured on this server yet. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then restart.",
+  cancelled: "Google sign-in was cancelled.",
+  state: "That sign-in attempt expired. Please try again.",
+  unverified_email: "Your Google account's email address is not verified with Google.",
+  error: "Google sign-in could not be completed. Try again, or use your email and password.",
+  suspended: "This account is suspended.",
+};
+
 export default function LoginPage() {
   return (
     <Suspense fallback={<div className="min-h-dvh" />}>
@@ -30,26 +39,41 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const nextPath = params.get("next") || "/";
+  const googleError = params.get("google");
+  const reasonParam = params.get("reason");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [config, setConfig] = useState<MeResponse | null>(null);
+
+  useEffect(() => {
+    void api
+      .me()
+      .then(setConfig)
+      .catch(() => undefined);
+  }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await api.login({ email, password });
-      router.replace(nextPath.startsWith("/") ? nextPath : "/");
+      const { user } = await api.login({ email, password });
+      // Accounts without roles finish onboarding first.
+      const target = (user.roles ?? []).length === 0 ? "/welcome" : nextPath;
+      router.replace(target.startsWith("/") ? target : "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : (err as Error).message);
     } finally {
       setBusy(false);
     }
   };
+
+  const googleReady = config?.google?.configured === true;
+  const bootstrapAvailable = config?.adminSignIn?.bootstrapAvailable === true;
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
@@ -60,9 +84,7 @@ function LoginForm() {
         <h1 className="mt-4 text-fluid-title font-display font-bold tracking-tight">
           <GradientText>Elder Mi Music</GradientText>
         </h1>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted">
-          AI Studio
-        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted">AI Studio</p>
         <p className="mt-2 text-xs italic text-muted/80">“Your Sound. Your Culture. Your Studio.”</p>
       </div>
 
@@ -73,11 +95,38 @@ function LoginForm() {
             Private studio
           </StatusPill>
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          Your projects, audio and share links are tied to your account on this studio server.
-        </p>
 
-        <form className="mt-4 space-y-3" onSubmit={submit}>
+        {googleError ? (
+          <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/[0.08] px-2.5 py-2 text-[10px] leading-relaxed text-amber-100">
+            {GOOGLE_REASONS[googleError] ?? "Google sign-in could not be completed."}
+            {reasonParam ? ` ${decodeURIComponent(reasonParam)}` : ""}
+          </p>
+        ) : null}
+
+        {/* Google */}
+        <div className="mt-3">
+          {googleReady ? (
+            <a href={api.googleSignInUrl} className="btn-ghost w-full justify-center text-xs">
+              <Icon name="user" size={13} /> Continue with Google
+            </a>
+          ) : (
+            <div
+              className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-muted/70"
+              title={config?.google?.reason ?? "Checking configuration…"}
+            >
+              <Icon name="user" size={13} /> Continue with Google
+              <span className="rounded border border-amber-400/30 px-1 py-0.5 text-[8px] uppercase tracking-wide text-amber-200">
+                awaiting configuration
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="my-3 flex items-center gap-2 text-[9px] uppercase tracking-wider text-muted/50">
+          <span className="h-px flex-1 bg-white/10" /> or use email <span className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <form className="space-y-3" onSubmit={submit}>
           <div>
             <label className="label mb-1 block" htmlFor="email">
               Email
@@ -138,9 +187,38 @@ function LoginForm() {
           </Link>
           . The first account on a new studio owns the projects already saved here.
         </p>
+
+        {/* Admin */}
+        <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-2.5">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-softwhite">
+            <Icon name="lock" size={11} className="text-amber-300" /> Studio admin
+          </div>
+          {googleReady ? (
+            <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
+              The admin account signs in with Google, using the address in{" "}
+              <span className="mono">ADMIN_EMAIL</span>.
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
+              Google sign-in is not configured yet, so the admin uses a one-time bootstrap code.{" "}
+              {bootstrapAvailable ? (
+                <Link href="/admin-bootstrap" className="text-cyan-200 underline hover:text-white">
+                  Enter the bootstrap code →
+                </Link>
+              ) : (
+                <span>
+                  Set <span className="mono">ADMIN_EMAIL</span> and restart to generate one.
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+
         <p className="mt-2 text-center text-[9px] leading-relaxed text-muted/60">
-          No password reset email is sent: there is no mail service in this build. If you forget the
-          password, the server owner can reset it from the machine that runs the studio.
+          No password reset email is sent:{" "}
+          {config?.email?.configured
+            ? "email is configured, but reset links are not implemented yet."
+            : "this build has no mail provider. A forgotten password is reset by whoever runs the server."}
         </p>
       </GlassCard>
     </div>

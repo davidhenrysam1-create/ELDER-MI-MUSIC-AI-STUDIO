@@ -69,7 +69,11 @@ vi.mock("next/navigation", () => ({
 
 const { StudioShell } = await import("@/components/shell/StudioShell");
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  // Tests may set a signed-in account; never leak it into the next one.
+  (ctx as { user?: unknown }).user = undefined;
+});
 
 describe("studio shell across screen sizes", () => {
   it("keeps the brand, slogan and all three studio names", () => {
@@ -125,6 +129,69 @@ describe("studio shell across screen sizes", () => {
     const player = container.querySelector(".safe-bottom");
     expect(player).not.toBeNull();
     expect(screen.getAllByRole("button", { name: /^play$|^pause$/i }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("role-aware navigation and workspace gate", () => {
+  const account = {
+    id: "usr_test",
+    email: "artist@studio.test",
+    name: "Test Artist",
+    role: "member" as const,
+    roles: ["artist"],
+    isAdmin: false,
+    createdAt: new Date().toISOString(),
+    lastLoginAt: null,
+  };
+
+  it("hides the mixing and mastering studios from an artist", () => {
+    (ctx as { user?: unknown }).user = account;
+    const { container } = render(
+      <StudioShell>
+        <div>content</div>
+      </StudioShell>,
+    );
+    // Only the navigation text — the blocked-workspace card names the studio too.
+    const nav = container.querySelector("nav")?.textContent ?? "";
+    expect(nav).toContain("Sam Vocal Studio");
+    expect(nav).not.toContain("Sam Mix Studio");
+    expect(nav).not.toContain("Sam Mastering Studio");
+    // The admin console is never in an ordinary account's navigation.
+    expect(nav).not.toContain("Admin console");
+  });
+
+  it("replaces the mixer with an explanation when the pathname is not allowed", () => {
+    (ctx as { user?: unknown }).user = account;
+    render(
+      <StudioShell>
+        <div>content</div>
+      </StudioShell>,
+    );
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Sam Mix Studio is not on your dashboard");
+    expect(text).toContain("Change my roles");
+    expect(text).not.toContain("content");
+  });
+
+  it("shows the admin console to the admin only", () => {
+    (ctx as { user?: unknown }).user = { ...account, roles: ["artist", "producer", "engineer", "promoter"], isAdmin: true };
+    const { container } = render(
+      <StudioShell>
+        <div>content</div>
+      </StudioShell>,
+    );
+    expect(container.textContent ?? "").toContain("Admin console");
+    expect(container.textContent ?? "").toContain("content");
+  });
+
+  it("shows everything before the account has loaded", () => {
+    (ctx as { user?: unknown }).user = undefined;
+    const { container } = render(
+      <StudioShell>
+        <div>content</div>
+      </StudioShell>,
+    );
+    expect(container.textContent ?? "").toContain("Sam Mastering Studio");
   });
 });
 

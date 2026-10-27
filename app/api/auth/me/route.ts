@@ -7,14 +7,18 @@
 import {
   AuthError,
   accountCount,
+  adminSignInState,
   currentUser,
   deleteUser,
   endSession,
   guard,
   listSessions,
+  normalizeUser,
   updateProfile,
   type PublicUser,
 } from "@/lib/server/auth";
+import { emailStatus } from "@/lib/server/email";
+import { googleStatus } from "@/lib/server/google";
 import { deleteAccountData } from "@/lib/server/repo";
 import { asString, jsonError } from "@/lib/server/validation";
 
@@ -33,6 +37,11 @@ export async function GET() {
     sessions: user ? await listSessions(user.id) : [],
     signupOpen: await signupOpen(),
     allowSignupEnv: (process.env.ALLOW_SIGNUP ?? "true").toLowerCase() !== "false",
+    // Sign-in options are reported so the screens can be honest about what works
+    // instead of showing a Google button that cannot complete.
+    google: googleStatus(),
+    adminSignIn: await adminSignInState(),
+    email: emailStatus(),
   });
 }
 
@@ -42,8 +51,22 @@ export async function PATCH(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return jsonError("Invalid JSON body");
   try {
+    const links =
+      body.links && typeof body.links === "object"
+        ? (body.links as Record<string, unknown>)
+        : undefined;
     const user: PublicUser = await updateProfile(auth.user.id, {
       name: asString(body.name, auth.user.name, 60),
+      handle: body.handle === undefined ? undefined : asString(body.handle, "", 20),
+      bio: body.bio === undefined ? undefined : asString(body.bio, "", 400),
+      links: links
+        ? {
+            audiomack: asString(links.audiomack, "", 200),
+            instagram: asString(links.instagram, "", 200),
+            facebook: asString(links.facebook, "", 200),
+          }
+        : undefined,
+      roles: Array.isArray(body.roles) ? (body.roles as never) : undefined,
     });
     return Response.json({ user });
   } catch (err) {

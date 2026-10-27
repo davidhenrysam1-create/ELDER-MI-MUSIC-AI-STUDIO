@@ -16,8 +16,13 @@ import { NextResponse, type NextRequest } from "next/server";
  * can react instead of parsing HTML.
  */
 
-/** Paths that must work without an account. */
-const PUBLIC_PREFIXES = ["/login", "/signup", "/s/", "/offline"];
+/**
+ * Paths that must work without an account:
+ *  - the way in (`/login`, `/signup`) and the one-time admin code;
+ *  - a friend's shared link (`/s/`) and a creator's public page (`/u/`);
+ *  - the PWA fallback.
+ */
+const PUBLIC_PREFIXES = ["/login", "/signup", "/admin-bootstrap", "/s/", "/u/", "/offline"];
 const PUBLIC_FILES = [
   "/manifest.webmanifest",
   "/sw.js",
@@ -25,7 +30,12 @@ const PUBLIC_FILES = [
   "/icon.png",
   "/apple-icon.png",
 ];
-const PUBLIC_API = ["/api/auth/", "/api/share/"];
+/**
+ * APIs that work without a session. `/api/auth/` contains the sign-in routes
+ * themselves; `/api/share/` serves a shared link; `/api/profile/` is the public
+ * creator page. Everything else is refused before it reaches a handler.
+ */
+const PUBLIC_API = ["/api/auth/", "/api/share/", "/api/profile/"];
 
 function safeEqual(a: string, b: string) {
   if (a.length !== b.length) return false;

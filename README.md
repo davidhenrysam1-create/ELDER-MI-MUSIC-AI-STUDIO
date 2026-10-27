@@ -204,19 +204,69 @@ audio, exports, voice profiles and share links.
 
 | Screen | What it does |
 | --- | --- |
-| `/signup` | Name, email, password (8+ chars). The **first** account becomes the studio owner and adopts anything saved before accounts existed, so upgrading loses nothing. |
-| `/login` | Email + password, with "show password" and a return path (`?next=`). |
-| `/account` | Change display name, change password (signs every device out), see active sessions, close the account. |
+| `/signup` | Name, email, password (8+ chars) **and your roles** — artist, producer, engineer (beat maker), promoter, or several at once. The **first** account becomes the studio owner and adopts anything saved before accounts existed, so upgrading loses nothing. |
+| `/login` | Email + password, with "show password" and a return path (`?next=`). Shows **Continue with Google** once Google is configured, and says "awaiting configuration" until then. |
+| `/welcome` | The role picker, for accounts that arrive without roles (Google sign-in cannot ask). |
+| `/account` | Change display name, roles, public handle, bio and AudioMack / Instagram / Facebook links; change password (signs every device out); see active sessions; verification status; close the account. |
+| `/u/<handle>` | Your **public page**: name, roles, bio and social links — never your email. No sign-in needed to view it. |
+| `/admin` | The admin console (see below). Appears in the navigation only for the admin account. |
+| `/admin-bootstrap` | One-time admin sign-in while Google is not configured. |
+
+### Roles and dashboards
+
+Roles are stored on the account (`roles: ["artist", "producer", …]`) and mapped to screens in one file,
+`lib/roles.ts`, so the navigation and the API cannot drift apart:
+
+| Role | Gets |
+| --- | --- |
+| **Artist** | Sam Vocal Studio, publishing/promotion tools, shares. |
+| **Producer / beat maker** | The whole studio: vocal, mix, mastering, beats for sampling, shares. |
+| **Engineer** | Mixing and mastering plus vocal cleanup; the full three studios. |
+| **Promoter** | Publishing and promotion surfaces, shares. No processing tools. |
+
+Holding several roles combines them ("Artist & Producer"). A screen a role cannot use is hidden from the
+navigation *and* refused by the server — hiding a link is convenience, not the security boundary. The
+admin bypasses the filter and sees everything.
+
+### The admin console
+
+The admin is always the address in `ADMIN_EMAIL`; the right is recomputed on every request rather than
+stored, so nobody can promote themselves. `/admin` lists **every registered account** with its roles,
+sign-in method, verification state, project/file/storage counts and live share links, and lets the admin:
+
+- set roles (which changes that account's dashboards),
+- mark an address verified (the manual fallback while no mail provider exists),
+- suspend — which blocks sign-in **and** ends that account's sessions immediately,
+- delete an account together with every project, audio file, export and share link it owns.
+
+The admin account itself cannot be suspended or deleted, so the studio cannot lock itself out.
+
+**Getting in as admin:** sign in with Google using the `ADMIN_EMAIL` address. While Google is not
+configured, start the app and read the one-time bootstrap code printed in the terminal, then enter it at
+`/admin-bootstrap` (single use, 24 hours; set `ADMIN_BOOTSTRAP_CODE` to choose your own). **No admin
+password is stored in this repository** — if a password was ever shared in chat, change it wherever it is
+used.
 
 How it is stored: passwords are salted **scrypt** hashes (`scrypt$N$r$p$salt$hash`) in `db.json`;
 never plaintext, never sent to the browser. Sessions are a random 256-bit token in an `HttpOnly`,
 `SameSite=Lax` cookie; the database keeps only its SHA-256, so a copy of the database cannot be
 replayed as a login. Sessions last 30 days and are listed by device type — no IP addresses are stored.
 
-Honest gaps, stated in the UI too: **no verification or reset email** (this build has no mail service,
-so it does not pretend to send one), and **no email change** yet. A forgotten password is reset by the
-person running the server. `ALLOW_SIGNUP=false` closes new accounts; the first account can still be
-created, and existing accounts keep working.
+Honest gaps, stated in the UI too:
+
+- **No password-reset email** is sent, even with an email provider configured. A forgotten password is
+  reset by the person running the server.
+- **Email verification links** are issued and expire after 24 hours, but posting them needs
+  `RESEND_API_KEY` + `EMAIL_FROM`. Until then the account page says *"no email was sent"* and the admin
+  verifies accounts by hand.
+- **Continue with Google** is code-complete but visibly off until `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET` exist.
+- **Publishing, follows, likes and downloads on public pages** are planned, not built: a profile page
+  exists, its music shelf says so, and finished songs travel as share links today.
+- **No email change** yet.
+
+`ALLOW_SIGNUP=false` closes new accounts; the first account can still be created, and existing accounts
+keep working.
 
 ### Sharing with friends
 
@@ -251,6 +301,12 @@ Copy `.env.example` to `.env.local`:
 | `GEMINI_API_KEY` | Optional. Enables Gemini prompt improvement and mixing stages. Read server-side only. |
 | `GEMINI_MODEL` | Optional, default `gemini-2.5-flash`. |
 | `DATA_DIR` | Optional private data directory (default `./.data`). |
+| `ADMIN_EMAIL` | **Required for admin access.** The one address that always has admin rights. Leave it empty and nobody can open `/admin`. |
+| `ADMIN_BOOTSTRAP_CODE` | Optional. Fixed one-time admin code while Google is unconfigured; random and printed to the log if unset. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Turns on **Continue with Google**. Add `/api/auth/google/callback` as an authorised redirect URI. |
+| `GOOGLE_REDIRECT_URI` | Optional. Pins the redirect URI when it differs from `NEXT_PUBLIC_SITE_URL`. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | Optional. The only way verification emails are actually sent. Without them nothing is mailed and the UI says so. |
+| `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close public sign-up. |
 | `MAX_UPLOAD_MB`, `MAX_DURATION_SEC` | Default upload limits; editable in Settings. |
 | `VOICE_CONVERSION_API_URL` | Reserved for a licensed voice-conversion adapter. |
 | `GOOGLE_API_KEY` / `GOOGLE_VERTEX_ACCESS_TOKEN` + `GOOGLE_VERTEX_PROJECT` | Optional. Enables Lyria 2 beat/instrumental generation. |
@@ -323,15 +379,14 @@ optional `STUDIO_PASSWORD` Basic-auth gate still sits in front of everything as 
 For a public deployment also put the app behind HTTPS (the session cookie is marked `Secure` in
 production), keep `ALLOW_SIGNUP=false` if it is just you, and back up `.data/`. The storage layer is
 still single-node JSON + files; swapping `lib/server/db.ts` for Postgres is the path to horizontal
-scaling, and multi-tenancy beyond one server would need
-layer.
+scaling.
 
 ---
 
 ## 9. Testing
 
 ```bash
-npm test          # 120 tests
+npm test          # 232 tests across 16 files
 npm run typecheck
 npm run build
 ```
@@ -362,6 +417,18 @@ Covered (`tests/`):
   iOS "Add to Home Screen" explanation.
 - Responsiveness: shell rendering at any width, active-workspace semantics, the compact mobile tab
   bar, and stylesheet guards for safe areas, `dvh`, 16px fields, coarse-pointer targets and print.
+- Roles: the role → studio/route map, that a missing role means no access rather than full access,
+  that the admin bypasses every gate, and that the navigation hides what a role cannot open while a
+  typed URL gets an explanation instead of the tools.
+- Admin and identity: the admin address cannot be claimed or signed into with a password, only
+  `ADMIN_EMAIL` is admin, the admin cannot suspend itself, suspending ends the account's sessions and
+  refuses sign-in, the bootstrap code is single-use and refused once Google is configured, and the
+  admin console refuses non-admins (403) and anonymous callers (401).
+- Public profiles: only the holder's handle resolves, emails never appear in the payload, and a
+  suspended profile disappears.
+- Google and verification: first sign-in creates a verified account, repeat sign-ins link instead of
+  duplicating, an existing password account is linked, suspended accounts are refused, verification
+  tokens are stored only as a hash, expire, and work once.
 
 ---
 

@@ -1,4 +1,4 @@
-import { guard } from "@/lib/server/auth";
+import { guardAnyStudio } from "@/lib/server/auth";
 import { asString, jsonError } from "@/lib/server/validation";
 import type { Genre, MixPresetId, StemRole, StudioId } from "@/lib/types";
 import { improvePrompt } from "@/lib/server/promptEngine";
@@ -6,7 +6,8 @@ import { improvePrompt } from "@/lib/server/promptEngine";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const auth = await guard();
+  // Prompt help serves all three studios, so a promoter (no tools) is refused.
+  const auth = await guardAnyStudio();
   if (auth.response) return auth.response;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return jsonError("Invalid JSON body");
