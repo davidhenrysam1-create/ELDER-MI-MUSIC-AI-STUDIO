@@ -421,6 +421,15 @@ export const api = {
       user?: AccountUser;
       settings: StudioSettings;
       storage: { audioBytes: number; exportBytes: number };
+      /**
+       * Where the bytes physically live: this machine's disk, or Supabase.
+       * Settings shows it verbatim so durability is never implied.
+       */
+      storageDrivers?: {
+        durable: boolean;
+        blobs: { kind: "local" | "supabase"; label: string; durable: boolean; reason: string };
+        database: { kind: "local" | "supabase"; label: string; durable: boolean; reason: string };
+      };
       providers: {
         gemini: { configured: boolean; model: string };
         voiceConversion: { configured: boolean; note: string };

@@ -26,6 +26,13 @@ export const STATUS_LABEL: Record<CapabilityStatus, string> = {
 
 export const CAPABILITIES: Capability[] = [
   {
+    name: "Durable storage (Supabase Postgres + Storage)",
+    area: "Platform",
+    status: "needs",
+    detail:
+      "The blob store and the database are pluggable drivers. With SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set, audio moves to a private bucket and the database to one Postgres row guarded by a revision number, so a reset or redeploy cannot take your music. Awaiting configuration: until those values exist everything stays on this machine's disk, and Settings says so.",
+  },
+  {
     name: "Open studio (no sign-in screen)",
     area: "Platform",
     status: "ready",
@@ -101,13 +108,6 @@ export const CAPABILITIES: Capability[] = [
     status: "planned",
     detail:
       "Not built. There is no comment thread, no tipping/subscription and no email or push notification when someone follows or likes you. The UI labels these as planned.",
-  },
-  {
-    name: "Password reset by email",
-    area: "Platform",
-    status: "planned",
-    detail:
-      "No reset mail is sent, even when an email provider is configured. A forgotten password is reset by whoever runs the server, and the account page says exactly that.",
   },
   {
     name: "Generation billing guards (paid off by default, hard spend cap)",

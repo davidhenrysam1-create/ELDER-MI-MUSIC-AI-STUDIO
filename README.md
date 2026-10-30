@@ -303,6 +303,53 @@ Honest gaps, stated in the UI too:
 `ALLOW_SIGNUP=false` closes new accounts; the first account can still be created, and existing accounts
 keep working.
 
+### Durable storage — keeping your music when the machine goes away
+
+By default the database is `.data/db.json` and the stems live in `.data/audio` **on the machine running the
+studio**. That is a real risk: a reset sandbox, a new laptop or a redeploy takes everything with it (it
+already happened once in this project). The studio now has two storage drivers behind the same code:
+
+| Driver | Where the data goes | When it is used |
+| --- | --- | --- |
+| `local` | `.data/` on this machine | Default, and whenever Supabase is not configured |
+| `supabase` | A private Storage bucket + one Postgres row | Automatically once the credentials below exist |
+
+**Nothing else changes** — no migration command, no code edit. Route handlers ask the driver, the driver
+knows where the bytes are, and Settings → *Data on this studio* prints which one is live and whether it
+is off this machine.
+
+To turn it on (about five minutes, free tier is enough):
+
+1. Create a project at [supabase.com](https://supabase.com) and open **SQL Editor**:
+
+   ```sql
+   create table if not exists studio_docs (
+     id text primary key,
+     body jsonb not null,
+     rev integer not null default 1
+   );
+   alter table studio_docs enable row level security;
+   ```
+
+2. **Storage → New bucket →** name it `studio-audio`, keep it **private**.
+3. **Project Settings → API** → copy the **Project URL** and the **service_role** key.
+4. Put them in `.env.local`:
+
+   ```
+   SUPABASE_URL=https://<your-project>.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=<the service_role key>
+   ```
+
+5. Restart the studio. Settings → Storage should now read *off this machine* for both rows.
+
+Two honest notes: the database is stored as **one JSON document per studio** (the studio's data model),
+guarded by a revision number so two writes cannot silently overwrite each other — per-record tables are
+a later step. And the service-role key bypasses row-level security, so it must only ever live in
+`.env.local`, never in the browser or the repository.
+
+Moving existing files up is a copy at the moment, not automatic: keep the old `.data/` folder as the
+source, and tell me if you want a one-click "copy everything to the bucket" tool.
+
 ### "I sign in and it throws me back to the login screen"
 
 That is almost never a wrong password — the POST returns `200` and the browser then refuses to keep the
@@ -377,6 +424,9 @@ Copy `.env.example` to `.env.local`:
 | `GEMINI_API_KEY` | Optional. Enables Gemini prompt improvement and mixing stages. Read server-side only. |
 | `GEMINI_MODEL` | Optional, default `gemini-2.5-flash`. |
 | `DATA_DIR` | Optional private data directory (default `./.data`). |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Optional, recommended. Moves audio to a private Storage bucket and the database to one Postgres row, so a reset or redeploy cannot delete your music. Setup below. |
+| `SUPABASE_BUCKET`, `SUPABASE_TABLE` | Optional. Names of the bucket and table (defaults `studio-audio`, `studio_docs`). |
+| `STORAGE_DRIVER`, `DATABASE_DRIVER` | Optional. `local` or `supabase`. Unset means automatic: Supabase when configured, otherwise this machine's disk. |
 | `ADMIN_EMAIL` | **Required for admin access.** The one address that always has admin rights. Leave it empty and nobody can open `/admin`. |
 | `STUDIO_ACCOUNTS` | Optional. Leave unset for **open studio** (no sign-in screen, everything reachable as the owner). Set to `on` to restore the login screen, sign-up and per-person libraries. |
 | `ADMIN_BOOTSTRAP_CODE` | Optional. Fixed one-time admin code while Google is unconfigured; random and printed to the log if unset. |

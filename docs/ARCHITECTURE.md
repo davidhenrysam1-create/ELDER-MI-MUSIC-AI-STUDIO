@@ -206,6 +206,31 @@ passcode hash, expiry, revoke timestamp, counters). `Project`, `ExportRecord` an
 - Counters (`opens`, `downloads`, `lastOpenedAt`) are incremented on stream start and on successful
   download only. Nothing else about the visitor is stored.
 
+## 5c0. Storage drivers (`lib/server/drivers`)
+
+Two seams, one interface each:
+
+| Seam | Interface | Callers |
+| --- | --- | --- |
+| Audio + exports | `BlobStore` (`put`/`get`/`remove`/`exists`/`usage`) | `lib/server/storage.ts`, and through it every asset, export, share and release route |
+| Database | `SnapshotStore` (`load`/`save`) | `lib/server/db.ts` (`readDb`, `mutateDb`, `persist`) |
+
+`lib/server/drivers/index.ts` picks a driver from the environment — **credentials decide**, with
+`STORAGE_DRIVER` / `DATABASE_DRIVER` (`local` | `supabase`) as an override. Unset means: Supabase when
+`SUPABASE_URL` + a service-role key exist, otherwise the filesystem. Asking for `supabase` without
+credentials throws instead of silently falling back to the disk, because a quiet fallback is how a studio
+loses its music while believing it is backed up.
+
+Keys are identical in both drivers (`audio/<assetId>.<ext>`, `exports/<name>`), so a migration is a copy
+and the tests can compare the two. The Supabase driver is plain `fetch` against Storage (`/storage/v1/object/…`)
+and PostgREST (`/rest/v1/<table>`) — no SDK, no new dependency. Database writes are a conditional
+`PATCH … ?rev=eq.<n>`: a lost race re-reads the revision and retries, and `mutateDb()`'s promise chain
+means a single instance never races itself. That is last-write-wins between *instances* — documented, not
+hidden; per-record SQL is the next step if the studio ever runs more than one server.
+
+`storageStatus()` is what every screen reports: the driver's label, whether it is off this machine, and
+the sentence to act on. Nothing is inferred from `NODE_ENV`.
+
 ## 5d0. Open studio mode (`lib/server/auth.ts`, `middleware.ts`)
 
 `STUDIO_ACCOUNTS` unset (the default) means **open studio**:

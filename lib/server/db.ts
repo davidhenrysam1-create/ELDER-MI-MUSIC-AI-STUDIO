@@ -4,6 +4,7 @@ import type { Database, StudioSettings } from "@/lib/types";
 import { DEFAULT_LIMITS } from "@/lib/types";
 import { defaultMixState, defaultVocalState, DEFAULT_MASTER_CONTROLS } from "@/lib/projects";
 import { PROMPT_SEEDS } from "@/lib/types";
+import { blobStore, dataDir, snapshotStore } from "@/lib/server/drivers";
 
 const defaultMasterPrompt = PROMPT_SEEDS.mastering;
 
@@ -12,15 +13,16 @@ const defaultMasterPrompt = PROMPT_SEEDS.mastering;
  *
  * - Writes are atomic (temp file + rename) so a crash cannot corrupt the DB.
  * - Mutations are serialised through a promise chain.
- * - Audio binaries live in `.data/audio`, exports in `.data/exports`.
+ * - Audio binaries live in `.data/audio`, exports in `.data/exports` — or in a
+ *   private Supabase bucket when that is configured.
  *
- * For a multi-user deployment swap this module for Postgres/Supabase; every
- * caller talks to the same repository functions.
+ * **Where the data lives is a driver, not a rewrite.** The local file store is
+ * the default; set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` and the same
+ * `readDb()` / `mutateDb()` calls read and write one row in Postgres instead
+ * (see `lib/server/drivers`). No route handler knows the difference.
  */
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), ".data");
+const DATA_DIR = dataDir();
 
 const DB_PATH = path.join(DATA_DIR, "db.json");
 const AUDIO_DIR = path.join(DATA_DIR, "audio");
@@ -60,6 +62,8 @@ let cache: Database | null = null;
 let queue: Promise<unknown> = Promise.resolve();
 
 async function ensureDirs() {
+  // Only meaningful for the filesystem driver; a remote bucket needs no folders.
+  if (snapshotStore().kind === "supabase" && blobStore().kind === "supabase") return;
   await fs.mkdir(AUDIO_DIR, { recursive: true });
   await fs.mkdir(EXPORT_DIR, { recursive: true });
 }
@@ -72,23 +76,18 @@ export async function storagePaths() {
 export async function readDb(): Promise<Database> {
   if (cache) return cache;
   await ensureDirs();
-  try {
-    const raw = await fs.readFile(DB_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Database;
+  const stored = await snapshotStore().load();
+  if (stored && typeof stored === "object") {
+    const parsed = stored as Database;
     parsed.settings = { ...defaultSettings, ...parsed.settings };
     migrate(parsed);
     cache = parsed;
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code !== "ENOENT") {
-      // Corrupt file: keep it for forensics rather than silently overwriting.
-      if (err instanceof SyntaxError) {
-        await fs.rename(DB_PATH, `${DB_PATH}.corrupt-${Date.now()}`).catch(() => {});
-      }
-    }
-    cache = emptyDb();
-    await persist(cache);
+    return cache;
   }
+  // Nothing stored yet (a new laptop, an empty bucket, or a corrupt file the
+  // driver has already set aside): start from an empty studio and write it.
+  cache = emptyDb();
+  await persist(cache);
   return cache;
 }
 
@@ -178,9 +177,7 @@ function migrate(db: Database) {
 
 async function persist(db: Database) {
   await ensureDirs();
-  const tmp = `${DB_PATH}.${process.pid}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(db, null, 2), "utf8");
-  await fs.rename(tmp, DB_PATH);
+  await snapshotStore().save(db);
 }
 
 /** Run a serialised mutation. The callback may mutate the draft in place. */
@@ -201,22 +198,9 @@ export function invalidateCache() {
 }
 
 export async function storageUsage() {
-  const { AUDIO_DIR: a, EXPORT_DIR: e } = await storagePaths();
-  const sum = async (dir: string) => {
-    try {
-      const files = await fs.readdir(dir, { withFileTypes: true });
-      let bytes = 0;
-      for (const f of files) {
-        if (!f.isFile()) continue;
-        const st = await fs.stat(path.join(dir, f.name));
-        bytes += st.size;
-      }
-      return bytes;
-    } catch {
-      return 0;
-    }
-  };
-  return { audioBytes: await sum(a), exportBytes: await sum(e) };
+  // The driver knows where the bytes are; the meter follows it instead of
+  // assuming a directory exists.
+  return blobStore().usage();
 }
 
 export { AUDIO_DIR, EXPORT_DIR, DATA_DIR };
