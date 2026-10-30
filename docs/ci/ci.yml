@@ -96,14 +96,19 @@ jobs:
 
       - name: Start the container and check it answers
         run: |
+          # HEALTHCHECK in the Dockerfile probes /api/health, which answers
+          # without a session or a database. Run with accounts ON: that is the
+          # strictest case, and the probe must still get through.
           docker run -d --name studio -p 3000:3000 \
             -e ADMIN_EMAIL=ci@example.test \
             -e STUDIO_ACCOUNTS=on \
             elder-mi-music-ai-studio:ci
           # Give the server a moment, then fail loudly if it never answers.
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/login || true)
-            if [ "$code" = "200" ]; then echo "container answered 200"; exit 0; fi
+          for i in $(seq 1 45); do
+            body=$(curl -s http://localhost:3000/api/health || true)
+            if printf '%s' "$body" | grep -q '"ok":true'; then
+              echo "container answered: $body"; exit 0
+            fi
             sleep 2
           done
-          echo "container did not answer"; docker logs studio; exit 1
+          echo "container did not answer /api/health"; docker logs studio; exit 1
