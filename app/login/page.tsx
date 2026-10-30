@@ -36,6 +36,8 @@ const GOOGLE_REASONS: Record<string, string> = {
   suspended: "This account is suspended.",
   signup_closed:
     "New accounts are closed on this studio. Use an existing account, or ask the owner for access.",
+  // Rendered by the dedicated block above, which can name both addresses.
+  host_mismatch: "Google sign-in is set up for a different address.",
 };
 
 export default function LoginPage() {
@@ -52,6 +54,10 @@ function LoginForm() {
   const nextPath = params.get("next") || "/";
   const googleError = params.get("google");
   const reasonParam = params.get("reason");
+  // Set by /api/auth/google/start when the studio is configured for a different
+  // address than the one this browser is on.
+  const configuredHost = params.get("configured");
+  const currentHost = params.get("current");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -134,7 +140,26 @@ function LoginForm() {
           </StatusPill>
         </div>
 
-        {googleError && googleError !== "unconfigured" ? (
+        {googleError === "host_mismatch" ? (
+          /*
+           * The exact cause of Google's "403. That's an error." page: the button
+           * asked Google for a callback on one address while the browser is on
+           * another. Google only accepts addresses registered for this client, so
+           * the sign-in has to happen on the registered one.
+           */
+          <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/[0.08] px-2.5 py-2 text-[10px] leading-relaxed text-amber-100">
+            <span className="font-semibold">Google sign-in is set up for a different address.</span>{" "}
+            This studio is configured for{" "}
+            <span className="mono">{configuredHost ?? "another address"}</span>, but you opened it at{" "}
+            <span className="mono">{currentHost ?? "this address"}</span>. Google only accepts the
+            address registered for it, so it refused — nothing is wrong with your password.
+            <br />
+            Open the studio at{" "}
+            <span className="mono">https://{configuredHost ?? "your registered address"}</span> and
+            press Continue with Google there. Email and password work on every address, including
+            this one.
+          </div>
+        ) : googleError && googleError !== "unconfigured" ? (
           <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/[0.08] px-2.5 py-2 text-[10px] leading-relaxed text-amber-100">
             {GOOGLE_REASONS[googleError] ?? "Google sign-in could not be completed."}
             {reasonParam ? ` ${decodeURIComponent(reasonParam)}` : ""}

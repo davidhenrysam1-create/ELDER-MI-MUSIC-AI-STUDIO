@@ -15,6 +15,7 @@ import {
   OAUTH_STATE_COOKIE,
   authorizationUrl,
   googleConfigured,
+  redirectHostMismatch,
   requestOrigin,
 } from "@/lib/server/google";
 
@@ -25,6 +26,25 @@ export async function GET(request: Request) {
   const origin = requestOrigin(request);
   if (!googleConfigured()) {
     return NextResponse.redirect(new URL("/login?google=unconfigured", origin));
+  }
+
+  /*
+   * Stop before Google if the studio is configured for a different address.
+   *
+   * This is the "403. That's an error. We're sorry, but you do not have access to
+   * this document." case: the callback was built from a configured address the
+   * browser is not on (a preview URL, a tunnel, a half-finished domain move), so
+   * Google refused and the visitor was left with a dead end. Explaining it on our
+   * own screen is more useful, and it says which address to use instead.
+   */
+  const mismatch = redirectHostMismatch(origin);
+  if (mismatch) {
+    const query = new URLSearchParams({
+      google: "host_mismatch",
+      configured: mismatch.configuredHost,
+      current: mismatch.currentHost,
+    });
+    return NextResponse.redirect(new URL(`/login?${query.toString()}`, origin));
   }
   const state = randomBytes(16).toString("base64url");
   const store = await cookies();

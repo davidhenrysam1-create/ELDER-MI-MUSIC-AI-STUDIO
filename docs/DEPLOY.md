@@ -94,6 +94,11 @@ address.
 **Want Render's own disk instead of Supabase?** That needs the paid **Starter** plan: change `plan: free`
 to `plan: starter` and uncomment the `disk:` block at the bottom of `render.yaml`.
 
+**Google sign-in:** register `<your address>/api/auth/google/callback` in Google Cloud Console and keep
+`NEXT_PUBLIC_SITE_URL` equal to that same address. Google refuses every other host — including preview URLs,
+which change each session and therefore cannot be registered. When the two disagree the app stops before
+Google and explains, instead of leaving you on Google's "403. That's an error." page.
+
 **Health check:** every host probes `/api/health`. It answers `{"ok":true}` without a session or a database
 call, so a Supabase outage never makes a healthy deployment look dead.
 
