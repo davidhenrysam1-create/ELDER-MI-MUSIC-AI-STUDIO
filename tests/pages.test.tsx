@@ -127,6 +127,29 @@ describe("studio pages render with an open project", () => {
   }
 });
 
+describe("the two ways into the studio", () => {
+  /*
+   * Both screens have to be *visible and reachable*, not merely present in the
+   * codebase: the sign-in screen must offer a real "Create an account" button
+   * (a footnote link was too easy to miss), and the sign-up screen must offer a
+   * way back to sign-in.
+   */
+  it("the sign-in screen links to the create-account screen with a real button", async () => {
+    const mod = (await import("@/app/login/page")) as { default: () => React.ReactElement };
+    const Page = mod.default;
+    render(<Page />);
+    const link = screen.getByRole("link", { name: /create an account/i });
+    expect(link.getAttribute("href")).toBe("/signup");
+  });
+
+  it("the create-account screen links back to sign-in", async () => {
+    const mod = (await import("@/app/signup/page")) as { default: () => React.ReactElement };
+    const Page = mod.default;
+    render(<Page />);
+    expect(screen.getByRole("link", { name: /sign in/i }).getAttribute("href")).toBe("/login");
+  });
+});
+
 describe("empty project states", () => {
   for (const page of pages) {
     it(`${page.name} renders without a project`, async () => {

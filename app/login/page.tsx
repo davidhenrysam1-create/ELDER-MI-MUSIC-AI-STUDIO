@@ -34,6 +34,8 @@ const GOOGLE_REASONS: Record<string, string> = {
   unverified_email: "Your Google account's email address is not verified with Google.",
   error: "Google sign-in could not be completed. Try again, or use your email and password.",
   suspended: "This account is suspended.",
+  signup_closed:
+    "New accounts are closed on this studio. Use an existing account, or ask the owner for access.",
 };
 
 export default function LoginPage() {
@@ -231,12 +233,19 @@ function LoginForm() {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-[10px] leading-relaxed text-muted">
-          No account yet?{" "}
-          <Link href="/signup" className="text-cyan-200 underline hover:text-white">
-            Create one
-          </Link>
-          . The first account on a new studio owns the projects already saved here.
+        {/*
+          A real button, not a footnote. Creating an account was reachable only
+          through a small "Create one" link, which is easy to miss on a phone —
+          and on a public site it is the first thing a new visitor needs.
+        */}
+        <Link
+          href="/signup"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2.5 text-xs font-semibold text-softwhite transition-colors hover:border-white/30 hover:bg-white/[0.08]"
+        >
+          <Icon name="plus" size={13} /> Create an account
+        </Link>
+        <p className="mt-2 text-center text-[10px] leading-relaxed text-muted">
+          The first account on a new studio owns the projects already saved here.
         </p>
 
         {/*

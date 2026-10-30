@@ -47,6 +47,9 @@ export async function GET(request: Request) {
     const next = (user.roles ?? []).length === 0 ? "/welcome" : "/";
     return NextResponse.redirect(new URL(next, origin));
   } catch (err) {
+    // A closed studio is not a suspended account: say so, so the sign-in screen
+    // does not accuse the visitor of being blocked.
+    if (err instanceof AuthError && err.code === "signup_closed") return fail("signup_closed");
     if (err instanceof AuthError && err.status === 403) {
       return NextResponse.redirect(
         new URL(`/login?google=suspended&reason=${encodeURIComponent(err.message)}`, origin),

@@ -342,8 +342,9 @@ Honest gaps, stated in the UI too:
   (comments, tipping, notifications) are still planned.
 - **No email change** yet.
 
-`ALLOW_SIGNUP=false` closes new accounts; the first account can still be created, and existing accounts
-keep working.
+`ALLOW_SIGNUP=false` closes new accounts — **including via Google**, which is otherwise a side door
+around a closed studio. The owner's own `ADMIN_EMAIL` address is always allowed, so a private deployment
+can never lock its owner out. Existing accounts keep working either way.
 
 ### Durable storage — keeping your music when the machine goes away
 
@@ -525,7 +526,7 @@ Copy `.env.example` to `.env.local`:
 If the address ever changes (a new preview URL, a real domain), add the new redirect URI as well —
 Google allows several. Until credentials exist nothing is faked: no request leaves the server.
 | `RESEND_API_KEY`, `EMAIL_FROM` | Optional. The only way verification and password-reset emails are actually sent. Without them nothing is mailed and the UI says so. |
-| `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close public sign-up. |
+| `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close public sign-up, Google included. |
 | `MAX_UPLOAD_MB`, `MAX_DURATION_SEC` | Default upload limits; editable in Settings. |
 | `VOICE_CONVERSION_API_URL` | Reserved for a licensed voice-conversion adapter. |
 | `GOOGLE_API_KEY` / `GOOGLE_VERTEX_ACCESS_TOKEN` + `GOOGLE_VERTEX_PROJECT` | Optional. Enables Lyria 2 beat/instrumental generation. |
@@ -535,7 +536,7 @@ Google allows several. Until credentials exist nothing is faked: no request leav
 | `SPEND_CAP_USD` | Optional, default `5`. Hard ceiling on tracked generation spend. |
 | `*_USD_PER_SEC` | Optional cost overrides: `LYRIA_`, `STABLE_AUDIO_`, `ELEVENLABS_`, `REPLICATE_MUSICGEN_`. |
 | `STUDIO_PASSWORD`, `STUDIO_USER` | Optional HTTP Basic auth in front of the whole studio (an extra door before accounts). |
-| `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close new accounts; the first account can still be created. |
+| `ALLOW_SIGNUP` | Optional, default `true`. Set to `false` to close new accounts (Google too); the owner's `ADMIN_EMAIL` can always sign in. |
 
 Secrets never reach the browser: API routes read them and return only results.
 
