@@ -87,6 +87,7 @@ export interface AccountUser {
   /** True only for the address in ADMIN_EMAIL. */
   isAdmin?: boolean;
   emailVerified?: boolean;
+  // "bootstrap" is legacy: an account created by the old one-time code.
   provider?: "password" | "google" | "bootstrap";
   /** True while the admin still uses the setup password from ADMIN_PASSWORD. */
   passwordSeeded?: boolean;
@@ -117,7 +118,6 @@ export interface MeResponse {
     adminEmailMasked: string | null;
     adminExists: boolean;
     googleConfigured: boolean;
-    bootstrapAvailable: boolean;
     /** True when ADMIN_PASSWORD is set, so the admin can use the form above. */
     passwordConfigured?: boolean;
   };
@@ -251,11 +251,6 @@ export const api = {
   logout: () => jsonFetch<{ ok: true }>("/api/auth/logout", { method: "POST" }),
   /** Google sign-in needs a full navigation, so this is a URL, not a fetch. */
   googleSignInUrl: "/api/auth/google/start",
-  bootstrap: (code: string) =>
-    jsonFetch<{ user: AccountUser }>("/api/auth/bootstrap", {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    }),
   onboarding: (body: { roles: AccountRole[]; handle?: string }) =>
     jsonFetch<{ user: AccountUser }>("/api/auth/onboarding", {
       method: "POST",

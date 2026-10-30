@@ -52,11 +52,6 @@ const scrypt = promisify(scryptCb) as (
  */
 let sessionOverride: (() => Promise<PublicUser | null>) | null = null;
 
-/** Test seam: forget the in-memory bootstrap code so a test can start clean. */
-export function __resetBootstrapForTests(): void {
-  bootstrapRecord = null;
-}
-
 /** Set (or clear) the signed-in account used by tests. */
 export function __setSessionOverrideForTests(fn: (() => Promise<PublicUser | null>) | null) {
   sessionOverride = fn;
@@ -289,11 +284,11 @@ export async function signup(
   userAgent?: string | null,
 ): Promise<PublicUser> {
   const { name, email, password } = validateSignup(input);
-  // The admin address is reserved: it signs in with Google or a bootstrap code,
-  // so a stranger cannot claim it by knowing the address.
+  // The admin address is reserved: it signs in with ADMIN_PASSWORD or Google, so
+  // a stranger cannot claim it just by knowing the address.
   if (isAdminEmail(email)) {
     throw new AuthError(
-      "That address is reserved for the studio admin. Use “Continue with Google”, or the admin bootstrap code shown in the server log.",
+      "That address is reserved for the studio admin. Sign in at /login with the admin email and the password set on the server, or use “Continue with Google”.",
       403,
     );
   }
@@ -367,7 +362,21 @@ function claimOrphans(state: Awaited<ReturnType<typeof readDb>>, userId: string)
   for (const share of state.shares) if (!share.ownerId) share.ownerId = userId;
 }
 
-/** Sign in. Deliberately vague about which half was wrong. */
+/**
+ * Sign in with email and password.
+ *
+ * The owner is a special case, and deliberately a frictionless one: the address
+ * in `ADMIN_EMAIL` plus the password in `ADMIN_PASSWORD` *are* the owner account.
+ * If no account exists yet (a brand-new deployment, or a free host that wiped its
+ * temporary disk), the first successful sign-in creates it — with every role and
+ * the admin console — instead of demanding a one-time code from a log the owner
+ * may not be able to reach on a phone.
+ *
+ * That is safe because it is not a shortcut past authentication: the password
+ * still has to match the operator's `ADMIN_PASSWORD`, which lives only in the
+ * host's environment. Nothing is hardcoded, and no account is created for anyone
+ * else this way.
+ */
 export async function login(
   input: { email: string; password: string },
   userAgent?: string | null,
@@ -376,21 +385,38 @@ export async function login(
   const password = input.password ?? "";
   const wantsAdmin = isAdminEmail(email);
 
-  // An admin account created by the bootstrap code (or by Google) starts with no
-  // password. If the operator set ADMIN_PASSWORD, adopt it now — once — so the
-  // admin can sign in with email + password from then on.
-  if (wantsAdmin) await seedAdminPassword();
+  if (wantsAdmin) {
+    // 1. First sign-in on a fresh deployment: create the owner from the two
+    //    configured values, then sign them straight in.
+    const created = await provisionAdminOnFirstSignIn(email, password);
+    if (created) {
+      await startSession(created.id, userAgent);
+      return toPublic(created);
+    }
+    // 2. The account exists but has no password yet (it arrived through Google):
+    //    adopt ADMIN_PASSWORD once, then the normal check below succeeds.
+    await seedAdminPassword();
+  }
 
   const db = await readDb();
   const user = db.users.find((entry) => entry.email === email);
   // Hash even when the email is unknown, so timing does not reveal accounts.
   const known = user ? await verifyPassword(password, user.passwordHash) : await hashPassword(password).then(() => false);
   if (!user || !known) {
-    // For the admin address only, say what to do instead of a bare failure: this
-    // is the one account whose owner cannot reset a password by email.
+    /*
+     * For the admin address only, say what is actually wrong. The owner cannot
+     * reset their own password by email when no mail provider is configured, so
+     * a bare "incorrect" would leave them with nothing to act on.
+     */
+    if (wantsAdmin && !user && !adminPasswordConfigured()) {
+      throw new AuthError(
+        "No owner account can be created yet: set ADMIN_EMAIL and ADMIN_PASSWORD (at least 8 characters) on the server, then sign in with exactly those two values.",
+        401,
+      );
+    }
     if (wantsAdmin && !user) {
       throw new AuthError(
-        "The admin account has not been created yet. Open /admin-bootstrap and enter the one-time code from the server log.",
+        "That password does not match ADMIN_PASSWORD, so the owner account was not created. Check the value in the host's environment settings.",
         401,
       );
     }
@@ -978,11 +1004,10 @@ export async function adminUpdateUser(
 /**
  * Optional setup password for the admin account (`ADMIN_PASSWORD`).
  *
- * Why it exists: the admin normally signs in with Google, and while Google is
- * unconfigured it uses a one-time bootstrap code. Both can leave the owner
- * locked out (Google off, code already used, or the code lost with a server
- * restart). Setting `ADMIN_PASSWORD` gives the admin a normal email + password
- * sign-in that survives restarts.
+ * Why it exists: this pair of values *is* the owner account. Together with
+ * `ADMIN_EMAIL` it signs the owner in on any deployment — including a fresh one,
+ * and including a free host that wiped its temporary disk — without a code to
+ * hunt for in a log. Nothing is stored in the repository.
  *
  * The value lives in `.env.local` (git-ignored) — never in the repository — and
  * is only used to *seed* the password once. After that the stored scrypt hash is
@@ -1004,8 +1029,8 @@ export function adminPasswordConfigured(): boolean {
 /**
  * Give the admin account the setup password if it has none yet.
  *
- * Runs on every admin sign-in attempt, so an account created by the bootstrap
- * code or by Google gains a password the next time the admin tries to sign in.
+ * Runs on every admin sign-in attempt, so an account that arrived through Google
+ * gains a password the next time the admin tries to sign in.
  * An existing hash is never replaced — that would undo a password change.
  */
 async function seedAdminPassword(): Promise<void> {
@@ -1035,7 +1060,7 @@ export function googleConfigured(): boolean {
  * Rules:
  *  - an existing account with the same email is linked to Google instead of
  *    creating a duplicate;
- *  - the reserved admin address may only arrive this way or by bootstrap code;
+ *  - the reserved admin address may also arrive this way (or by ADMIN_PASSWORD);
  *  - suspended accounts are refused before a session is created;
  *  - a brand-new account starts with no roles and is sent to `/welcome`.
  */
@@ -1096,70 +1121,87 @@ export async function signInWithGoogle(
 }
 
 /* ------------------------------------------------------------------ */
-/* Admin bootstrap (no Google configured yet)                          */
+/* Owner account                                                       */
 /* ------------------------------------------------------------------ */
 
-interface BootstrapRecord {
-  codeHash: string;
-  expiresAt: string;
-  usedAt: string | null;
+/** True when two strings match, compared in constant time. */
+function secretsMatch(supplied: string, expected: string): boolean {
+  // Hash both first: equal-length digests, so the comparison leaks nothing about
+  // the expected password's length or content.
+  const a = createHash("sha256").update(supplied, "utf8").digest();
+  const b = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(a, b);
 }
 
-/** In-memory bootstrap record; never written to the database or git. */
-let bootstrapRecord: BootstrapRecord | null = null;
-
 /**
- * The code the operator can type on `/admin-bootstrap`.
+ * Create the owner account from `ADMIN_EMAIL` + `ADMIN_PASSWORD` if it does not
+ * exist and the supplied password is the configured one.
  *
- * `ADMIN_BOOTSTRAP_CODE` wins if set (so it survives a restart and can be read
- * from `.env.local`), otherwise a random code is generated once per process and
- * printed to the server log. It is single-use and expires after 24 hours.
+ * Returns the new account, or `null` when this is not a first sign-in (the
+ * account already exists, no `ADMIN_PASSWORD` is set, or the password is wrong —
+ * in which case the normal sign-in path reports the usual failure).
  */
-export function currentBootstrapCode(): string | null {
-  if (googleConfigured()) return null;
-  if (bootstrapRecord?.usedAt) return null;
-  if (bootstrapRecord && new Date(bootstrapRecord.expiresAt) > new Date()) return null;
+async function provisionAdminOnFirstSignIn(email: string, password: string): Promise<User | null> {
+  const secret = adminPassword();
+  if (!secret) return null;
 
-  const fromEnv = process.env.ADMIN_BOOTSTRAP_CODE?.trim();
-  const code = fromEnv && fromEnv.length >= 8 ? fromEnv : randomBytes(9).toString("base64url");
-  bootstrapRecord = {
-    codeHash: sha256(code),
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    usedAt: null,
-  };
-  return code;
+  const db = await readDb();
+  // An existing account is never replaced: from here on the stored hash decides.
+  if (db.users.some((user) => user.email === email)) return null;
+  if (!secretsMatch(password, secret)) return null;
+
+  const passwordHash = await hashPassword(secret);
+  return mutateDb((state) => {
+    // Guard again inside the write, in case two requests raced.
+    const already = state.users.find((user) => user.email === email);
+    if (already) return already;
+
+    const created: User = {
+      id: `usr_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
+      email,
+      name: "Studio admin",
+      passwordHash,
+      role: state.users.length === 0 ? "owner" : "member",
+      // Every role, so the studios and the admin console are usable at once.
+      roles: ACCOUNT_ROLES.slice(),
+      handle: "admin",
+      bio: "",
+      links: emptyLinks(),
+      isAdmin: true,
+      emailVerified: true,
+      provider: "password",
+      googleSub: null,
+      passwordSeeded: true,
+      suspendedAt: null,
+      suspendedReason: null,
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+    state.users.push(created);
+    // Work saved before anyone had an account belongs to the owner.
+    if (state.users.length === 1) claimOrphans(state, created.id);
+    return created;
+  });
 }
 
 /**
- * The admin state for the sign-in screen: is Google ready, is there an admin
- * account, and is a bootstrap code still available?
+ * What the sign-in screen needs to know about the owner account.
+ *
+ * There is no one-time code: the owner signs in with `ADMIN_EMAIL` and
+ * `ADMIN_PASSWORD`, and the account is created from those two on the first
+ * successful sign-in (see `login`). Nothing has to be read off a server log,
+ * which matters on a free host whose log is hard to reach from a phone.
  */
 export async function adminSignInState() {
   const db = await readDb();
   const email = adminEmail();
   const account = email ? db.users.find((user) => user.email === email) ?? null : null;
-  const google = googleConfigured();
-  let bootstrapAvailable = false;
-  if (email && !google) {
-    if (!bootstrapRecord || new Date(bootstrapRecord.expiresAt) <= new Date()) {
-      const code = currentBootstrapCode();
-      if (code) {
-        // Printing is the only delivery channel when there is no mail service.
-        console.info(
-          `\n[Elder Mi] Admin bootstrap code for ${email}: ${code}\n` +
-            "Open /admin-bootstrap and enter it once. Set ADMIN_BOOTSTRAP_CODE to control it yourself.\n",
-        );
-      }
-    }
-    bootstrapAvailable = Boolean(bootstrapRecord && !bootstrapRecord.usedAt);
-  }
   return {
     // Masked on purpose: `/api/auth/me` is readable without signing in, and the
     // owner's address should not be published by the sign-in screen.
     adminEmailMasked: maskEmail(email),
     adminExists: Boolean(account),
-    googleConfigured: google,
-    bootstrapAvailable,
+    googleConfigured: googleConfigured(),
     // True when ADMIN_PASSWORD is set: the admin can use the email + password form.
     passwordConfigured: adminPasswordConfigured(),
   };
@@ -1172,95 +1214,6 @@ function maskEmail(email: string | null): string | null {
   if (!domain) return null;
   const visible = local.slice(0, 1);
   return `${visible}${"*".repeat(Math.max(3, Math.min(local.length - 1, 6)))}@${domain}`;
-}
-
-/**
- * Redeem the bootstrap code and sign in as the admin.
- *
- * Creates the admin account if it does not exist yet, with every role so the
- * console is usable immediately. There is no password: once Google is
- * configured this route refuses, and the admin signs in with Google instead.
- */
-export async function redeemBootstrapCode(
-  code: string,
-  userAgent?: string | null,
-): Promise<PublicUser> {
-  const email = adminEmail();
-  if (!email) throw new AuthError("No ADMIN_EMAIL is configured on this server.", 400);
-  if (googleConfigured()) {
-    throw new AuthError("Google sign-in is configured — sign in with Google instead.", 400);
-  }
-  // A code pinned in `.env.local` must work even if no page has asked for one yet
-  // (the record is otherwise created by `adminSignInState()` on the sign-in page).
-  if (!bootstrapRecord) {
-    const fromEnv = process.env.ADMIN_BOOTSTRAP_CODE?.trim();
-    if (fromEnv && fromEnv.length >= 8) {
-      bootstrapRecord = {
-        codeHash: sha256(fromEnv),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        usedAt: null,
-      };
-    }
-  }
-  const current = bootstrapRecord;
-  if (!current || current.usedAt) {
-    throw new AuthError("No bootstrap code is active. Restart the server to generate one.", 403);
-  }
-  if (new Date(current.expiresAt) <= new Date()) {
-    throw new AuthError("That bootstrap code expired. Restart the server to generate a new one.", 403);
-  }
-  if (sha256(code.trim()) !== current.codeHash) {
-    throw new AuthError("That bootstrap code is not correct.", 401);
-  }
-
-  const db = await readDb();
-  const existing = db.users.find((user) => user.email === email);
-  // A setup password (if configured) is stored with the account, so the admin can
-  // sign in again at /login without asking for another one-time code.
-  const setupSecret = adminPassword();
-  const setupHash = setupSecret ? await hashPassword(setupSecret) : "";
-
-  const user = await mutateDb((state) => {
-    if (existing) {
-      const record = state.users.find((entry) => entry.id === existing.id)!;
-      record.provider = "bootstrap";
-      record.emailVerified = true;
-      record.lastLoginAt = new Date().toISOString();
-      record.roles = ACCOUNT_ROLES.slice();
-      if (setupHash && !record.passwordHash) {
-        record.passwordHash = setupHash;
-        record.passwordSeeded = true;
-      }
-      return record;
-    }
-    const created: User = {
-      id: `usr_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
-      email,
-      name: "Studio admin",
-      passwordHash: setupHash,
-      role: state.users.length === 0 ? "owner" : "member",
-      roles: ACCOUNT_ROLES.slice(),
-      handle: "admin",
-      bio: "",
-      links: emptyLinks(),
-      isAdmin: true,
-      emailVerified: true,
-      provider: "bootstrap",
-      googleSub: null,
-      passwordSeeded: Boolean(setupHash),
-      suspendedAt: null,
-      suspendedReason: null,
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    };
-    state.users.push(created);
-    if (state.users.length === 1) claimOrphans(state, created.id);
-    return created;
-  });
-
-  bootstrapRecord = { ...current, usedAt: new Date().toISOString() };
-  await startSession(user.id, userAgent);
-  return toPublic(user);
 }
 
 /* ------------------------------------------------------------------ */

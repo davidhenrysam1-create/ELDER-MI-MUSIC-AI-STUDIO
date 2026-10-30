@@ -9,7 +9,6 @@
  * Screens that work without an account:
  *  - `/login`, `/signup`     — the way in;
  *  - `/forgot`, `/reset`     — forgotten-password recovery by email;
- *  - `/admin-bootstrap`      — the one-time admin code, needed *before* a session;
  *  - `/s/<token>`            — a friend's shared listening page;
  *  - `/u/<handle>`           — a public profile and its published music;
  *  - `/offline`              — the service-worker fallback.
@@ -23,7 +22,6 @@ export const PUBLIC_PATHS = [
   "/signup",
   "/forgot",
   "/reset",
-  "/admin-bootstrap",
   "/offline",
 ] as const;
 export const PUBLIC_PREFIXES = ["/s/", "/u/"] as const;

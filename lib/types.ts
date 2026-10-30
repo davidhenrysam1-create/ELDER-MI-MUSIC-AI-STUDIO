@@ -445,6 +445,10 @@ export interface StudioSettings {
 export type AccountRole = "artist" | "producer" | "engineer" | "promoter";
 
 /** Where the account's credentials come from. */
+/**
+ * How an account was created. `"bootstrap"` is legacy: older databases may still
+ * hold it from the retired one-time admin code, and it must keep loading.
+ */
 export type AuthProvider = "password" | "google" | "bootstrap";
 
 /** Social platforms an account can link from its profile. */
