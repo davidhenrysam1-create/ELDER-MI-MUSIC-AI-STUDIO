@@ -25,6 +25,7 @@
  * studio that refuses to open is a worse failure than one that tells you what to
  * paste.
  */
+import os from "node:os";
 import path from "node:path";
 import type { BlobStore, DriverStatus, SnapshotStore } from "./types";
 import { localBlobStore, localSnapshotStore } from "./local";
@@ -35,9 +36,31 @@ export { resetRuntimeStatus, runtimeStatus } from "./resilient";
 
 export type { BlobStore, DriverStatus, SnapshotStore } from "./types";
 
-/** Where the JSON database and audio live when the filesystem driver is used. */
+/**
+ * True on a platform whose filesystem is temporary (Vercel, Lambda, Cloud Run
+ * without a volume). The studio still runs there — it just cannot keep anything
+ * on disk, which is exactly what the storage banner has to say.
+ */
+export function ephemeralFilesystem(): boolean {
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.K_SERVICE || // Cloud Run
+      process.env.RENDER, // Render without a disk
+  );
+}
+
+/**
+ * Where the JSON database and audio live when the filesystem driver is used.
+ *
+ * `DATA_DIR` always wins. Otherwise: a writable temporary directory on a
+ * serverless host (writing next to the app there fails with EROFS), and `.data/`
+ * beside the app on a laptop, a container or any normal server.
+ */
 export function dataDir(): string {
-  return process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(process.cwd(), ".data");
+  if (process.env.DATA_DIR?.trim()) return path.resolve(process.env.DATA_DIR);
+  if (ephemeralFilesystem()) return path.join(os.tmpdir(), "elder-mi-studio");
+  return path.join(process.cwd(), ".data");
 }
 
 /**
@@ -242,6 +265,16 @@ function statusFor(kind: DriverChoice, label: string, envName: string): DriverSt
       label,
       durable: true,
       reason: "Stored by Supabase, so it survives a redeploy, a reset container or a new laptop.",
+    };
+  }
+  if (ephemeralFilesystem()) {
+    return {
+      kind,
+      label,
+      durable: false,
+      // A hosting platform's filesystem is temporary: saying "this machine" would
+      // hide the fact that the data is gone on the next restart.
+      reason: `${missingReason()} This host's filesystem is temporary, so anything saved here disappears on the next deploy or restart. Configure Supabase before adding real music.`,
     };
   }
   return {

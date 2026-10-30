@@ -1,0 +1,14 @@
+# Build inputs that must never enter the image.
+node_modules
+.next
+.git
+.github
+.data
+coverage
+*.log
+.env
+.env.*
+!.env.example
+docs/screenshots
+.vscode
+.idea

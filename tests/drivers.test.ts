@@ -6,6 +6,8 @@ import { localBlobStore, localSnapshotStore } from "@/lib/server/drivers/local";
 import { supabaseBlobStore, supabaseSnapshotStore } from "@/lib/server/drivers/supabase";
 import {
   blobStore,
+  dataDir,
+  ephemeralFilesystem,
   databaseDriverChoice,
   driverHealth,
   durableStorage,
@@ -238,6 +240,42 @@ describe("Supabase snapshot driver", () => {
     const patches = calls.filter((call) => call.method === "PATCH");
     expect(patches).toHaveLength(2);
     expect(patches[1].url).toContain("rev=eq.9");
+  });
+});
+
+describe("where the filesystem driver writes", () => {
+  afterEach(() => {
+    delete process.env.VERCEL;
+    delete process.env.DATA_DIR;
+    resetDrivers();
+  });
+
+  it("uses .data beside the app on a normal machine", () => {
+    expect(dataDir().endsWith(".data")).toBe(true);
+    expect(dataDir()).toContain(process.cwd());
+  });
+
+  it("honours DATA_DIR above everything else", () => {
+    process.env.DATA_DIR = "/srv/elder-mi/data";
+    expect(dataDir()).toBe("/srv/elder-mi/data");
+  });
+
+  it("moves to a writable temp folder on a serverless host", () => {
+    // Writing next to the app on Vercel fails with EROFS; the studio must not.
+    process.env.VERCEL = "1";
+    const dir = dataDir();
+    expect(dir).toContain("elder-mi-studio");
+    expect(dir.startsWith(os.tmpdir())).toBe(true);
+    expect(ephemeralFilesystem()).toBe(true);
+  });
+
+  it("says out loud that a temporary disk is not storage", () => {
+    process.env.VERCEL = "1";
+    resetDrivers();
+    const status = storageStatus();
+    expect(status.blobs.durable).toBe(false);
+    expect(status.blobs.reason).toMatch(/temporary/i);
+    expect(status.blobs.reason).toMatch(/disappears/i);
   });
 });
 

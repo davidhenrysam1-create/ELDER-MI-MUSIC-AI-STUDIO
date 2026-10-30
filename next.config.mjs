@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  /**
+   * Emit a self-contained server (`.next/standalone`) for the Docker image and
+   * for any host that runs the build output directly. `next start` keeps working
+   * for the plain `npm run start` flow, so this changes nothing locally.
+   */
+  output: "standalone",
   // The app is previewed through a proxied host in sandboxes; allow those dev
   // origins so Next does not block its own asset requests.
   allowedDevOrigins: ["localhost", "127.0.0.1", "*.e2b.app", "*.arena.ai"],

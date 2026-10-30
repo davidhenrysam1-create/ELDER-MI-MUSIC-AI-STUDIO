@@ -30,8 +30,8 @@ Git history, and the architecture/plan documents are kept in [`plan_app.txt`](./
 ## 2. Quick start
 
 ```bash
-npm install
-cp .env.example .env.local     # optional: add a Gemini key
+npm ci                         # Node 20.9+ (see .nvmrc)
+cp .env.example .env.local     # optional: add Gemini and Supabase keys
 npm run dev                    # http://localhost:3000
 ```
 
@@ -41,14 +41,24 @@ The dev server binds to `0.0.0.0:3000`. Private audio and the project index live
 Production:
 
 ```bash
-npm run build
+npm run verify                 # typecheck + tests + build, the same gate CI uses
 npm start
 ```
 
-> **Deployment note:** `.data` must be a persistent volume. Serverless platforms with an ephemeral
-> filesystem will lose audio between requests. For multi-user hosting, replace
-> `lib/server/db.ts` + `lib/server/storage.ts` with Postgres/Supabase and object storage; all
-> callers use the same repository functions.
+**Prefer no Node install?** Docker runs the same app anywhere:
+
+```bash
+docker compose up -d           # http://localhost:3000, data in a named volume
+```
+
+### Where to run it — one guide, five ways
+
+[`docs/DEPLOY.md`](docs/DEPLOY.md) covers: your laptop, **Docker** on any machine, a **public web version
+on Render**, **Vercel**, **Google Cloud Run**, and installing the **PWA** on Android/iOS. It also explains
+which options keep your audio (a volume, or Supabase) and which do not.
+
+Nothing is left as "figure it out later": the storage banner inside the app always states whether the data
+is on this machine or somewhere durable, and names the variable to set.
 
 ### Scripts
 
@@ -58,6 +68,22 @@ npm start
 | `npm run build` / `npm start` | Production build and server |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest unit/integration tests (DSP, prompt engine, persistence) |
+| `npm run verify` | Typecheck + tests + production build — run this before pushing |
+| `npm run docker:build` / `npm run docker:run` | Container image, and run it with a data volume |
+
+### Continuous integration
+
+[`docs/ci/ci.yml`](docs/ci/ci.yml) proves a clean clone works, on every push and pull request:
+
+- **Ubuntu (Node 20 & 22), macOS (22), Windows (22)** — `npm ci` → typecheck → tests → production build.
+- **Docker** — builds the image, starts it, and fails unless the studio answers `/login` with `200`.
+
+**One-time activation (30 seconds):** copy that file to `.github/workflows/ci.yml` — via GitHub's
+*Add file → Create new file*, or `mkdir -p .github/workflows && cp docs/ci/ci.yml .github/workflows/ci.yml`.
+It lives in `docs/` because the tooling that wrote this repository is not permitted to create workflow
+files; once it is in place the checks run automatically.
+
+Until then, the same gate is one command locally: **`npm run verify`**.
 
 ---
 

@@ -1,0 +1,23 @@
+# `docker compose up -d` — the studio on http://localhost:3000, with its data in a
+# named volume so a recreated container keeps every project.
+services:
+  studio:
+    build: .
+    image: elder-mi-studio:latest
+    container_name: elder-mi-studio
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    # Optional: copy .env.example to .env.local and fill in what you have.
+    # Remove this line if you would rather set variables in your host's UI.
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      # Without Supabase these two lines are what keep the music: the volume.
+      DATA_DIR: /app/.data
+    volumes:
+      - studio-data:/app/.data
+
+volumes:
+  studio-data:
