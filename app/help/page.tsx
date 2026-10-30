@@ -114,6 +114,10 @@ const DAW_GUIDES: { id: string; name: string; tint: string; steps: Step[] }[] = 
 
 const FAQ: { q: string; a: string }[] = [
   {
+    q: "Will my songs survive if the server restarts or moves?",
+    a: "Only if storage is configured to leave this machine. By default the database is .data/db.json and the audio is .data/audio on the server running the studio, so a reset container, a new laptop or a redeploy takes everything with it. Paste SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY into .env.local (with a private studio-audio bucket and a studio_docs table), restart, and audio moves to Supabase Storage while the database moves to one Postgres row. Settings → Data on this studio tells you which one is live: 'on this machine' or 'off this machine'. The studio never claims a backup that does not exist.",
+  },
+  {
     q: "Do I need an account to use the studio?",
     a: "No. This build runs in open studio mode: opening the address takes you straight to the dashboard, and every studio, project, export, share link, public page and the admin console are already there. The app acts as the studio owner account (ADMIN_EMAIL) — created automatically with all four roles — so publishing, likes, follows and downloads work immediately. The sign-in and sign-up screens forward to the dashboard, and Sign out is hidden. If the owner wants separate libraries again, they set STUDIO_ACCOUNTS=on and restart: the login screens return and nothing is lost.",
   },

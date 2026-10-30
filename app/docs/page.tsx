@@ -53,6 +53,20 @@ const ENV_VARS = [
       "Optional. Enables Continue with Google. Register <your address>/api/auth/google/callback as an authorised redirect URI (click the Google button before configuring it — the panel prints the exact address to copy). Without them the button opens that set-up panel; nothing is faked.",
   },
   {
+    key: "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY",
+    detail:
+      "Optional but recommended. Moves audio to a private Supabase Storage bucket and the database to one Postgres row, so a reset, a redeploy or a new laptop cannot delete your music. Settings → Data on this studio shows which driver is live. The service-role key must stay in .env.local only.",
+  },
+  {
+    key: "SUPABASE_BUCKET / SUPABASE_TABLE",
+    detail: "Optional. Names used by the Supabase driver (defaults: studio-audio, studio_docs).",
+  },
+  {
+    key: "STORAGE_DRIVER / DATABASE_DRIVER",
+    detail:
+      "Optional. local | supabase. Unset means automatic: Supabase when configured, otherwise this machine's disk. Asking for supabase without credentials fails loudly rather than quietly keeping data on the disk.",
+  },
+  {
     key: "GOOGLE_REDIRECT_URI",
     detail: "Optional. Pins the OAuth redirect URI when it differs from NEXT_PUBLIC_SITE_URL.",
   },

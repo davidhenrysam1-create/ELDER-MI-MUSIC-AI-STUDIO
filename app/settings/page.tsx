@@ -362,10 +362,39 @@ export default function SettingsPage() {
               <span className="mono text-softwhite">{formatBytes(used)}</span>
             </div>
           </div>
-          <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-[10px] leading-relaxed text-muted">
-            Audio is stored in <span className="mono">.data/audio</span> on the server and streamed
-            through authenticated studio endpoints with Range support. Files are never served from a
-            public folder. Delete a project to remove its audio, bounces and versions.
+          <div className="mt-3 space-y-2">
+            {[
+              { title: "Audio and exports", status: system?.storageDrivers?.blobs },
+              { title: "Database (projects, accounts)", status: system?.storageDrivers?.database },
+            ].map((row) => (
+              <div
+                key={row.title}
+                className="rounded-xl border border-white/10 bg-black/20 p-3 text-[10px] leading-relaxed text-muted"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <span className="font-semibold text-softwhite">{row.title}</span>
+                  <span
+                    className={cn(
+                      "rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wide",
+                      row.status?.durable
+                        ? "border-emerald-400/30 text-emerald-200"
+                        : "border-amber-400/30 text-amber-200",
+                    )}
+                  >
+                    {row.status?.durable ? "off this machine" : "on this machine"}
+                  </span>
+                </div>
+                <div className="mt-1 mono text-[10px] text-softwhite/80">
+                  {row.status?.label ?? "This machine's disk (.data)"}
+                </div>
+                <p className="mt-1">{row.status?.reason}</p>
+              </div>
+            ))}
+            <p className="rounded-xl border border-white/10 bg-black/20 p-3 text-[10px] leading-relaxed text-muted">
+              Audio is streamed through authenticated studio endpoints with Range support — never from a
+              public folder, whichever driver is in use. Deleting a project removes its audio, bounces
+              and versions.
+            </p>
           </div>
           <div className="mt-3">
             <ConfirmButton

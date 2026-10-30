@@ -1,5 +1,6 @@
 import { guard } from "@/lib/server/auth";
 import { storageUsage } from "@/lib/server/db";
+import { durableStorage, storageStatus } from "@/lib/server/drivers";
 import { geminiConfigured, geminiModel } from "@/lib/server/promptEngine";
 import { listDescriptors, providerSummary } from "@/lib/server/providers/registry";
 import { spendSummary } from "@/lib/server/generation";
@@ -22,6 +23,14 @@ export async function GET() {
     user: auth.user,
     settings,
     storage: usage,
+    /**
+     * Where the audio and the database physically live.
+     *
+     * Settings shows this verbatim: "this machine's disk" until Supabase is
+     * configured, and the bucket/table names once it is. The studio never
+     * implies a backup that does not exist.
+     */
+    storageDrivers: { ...storageStatus(), durable: durableStorage() },
     spend,
     providers: {
       gemini: { configured: geminiConfigured(), model: geminiModel() },
