@@ -1,6 +1,6 @@
 import { guard } from "@/lib/server/auth";
 import { storageUsage } from "@/lib/server/db";
-import { durableStorage, storageStatus } from "@/lib/server/drivers";
+import { durableStorage, runtimeStatus, storageStatus } from "@/lib/server/drivers";
 import { geminiConfigured, geminiModel } from "@/lib/server/promptEngine";
 import { listDescriptors, providerSummary } from "@/lib/server/providers/registry";
 import { spendSummary } from "@/lib/server/generation";
@@ -33,6 +33,8 @@ export async function GET() {
     storageDrivers: {
       ...storageStatus(),
       durable: durableStorage(),
+      /** Live: the remote store is configured but could not be reached. */
+      runtime: runtimeStatus(),
       // Non-null when a driver was requested but could not start; Settings shows
       // it in red rather than letting "local" look like the intended choice.
       warning: storageStatus().warning,
