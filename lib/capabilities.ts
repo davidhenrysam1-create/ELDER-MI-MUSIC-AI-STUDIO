@@ -30,7 +30,7 @@ export const CAPABILITIES: Capability[] = [
     area: "Platform",
     status: "needs",
     detail:
-      "The blob store and the database are pluggable drivers. With SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set, audio moves to a private bucket and the database to one Postgres row guarded by a revision number, so a reset or redeploy cannot take your music. Awaiting configuration: until those values exist everything stays on this machine's disk, and Settings says so.",
+      "The blob store and the database are pluggable drivers. With SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set, audio moves to a private bucket and the database to one Postgres row guarded by a revision number, so a reset or redeploy cannot take your music. This project's Supabase URL, bucket (tracks) and table (songs) are configured; the service-role key is still missing, so the studio stays on this machine's disk and Settings shows a red banner naming it.",
   },
   {
     name: "Open studio (no sign-in screen)",

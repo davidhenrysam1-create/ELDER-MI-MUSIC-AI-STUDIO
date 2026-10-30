@@ -30,7 +30,13 @@ export async function GET() {
      * configured, and the bucket/table names once it is. The studio never
      * implies a backup that does not exist.
      */
-    storageDrivers: { ...storageStatus(), durable: durableStorage() },
+    storageDrivers: {
+      ...storageStatus(),
+      durable: durableStorage(),
+      // Non-null when a driver was requested but could not start; Settings shows
+      // it in red rather than letting "local" look like the intended choice.
+      warning: storageStatus().warning,
+    },
     spend,
     providers: {
       gemini: { configured: geminiConfigured(), model: geminiModel() },

@@ -8,7 +8,15 @@
  * work is backed up.
  *
  * `STORAGE_DRIVER` / `DATABASE_DRIVER` override the automatic choice (`local`
- * forces the filesystem, `supabase` refuses to fall back silently).
+ * forces the filesystem).
+ *
+ * **Asking for Supabase without the credentials is a loud fallback, not a crash
+ * and not a silent lie.** Someone who copies a config file half-filled must still
+ * have a working studio, so the drivers stay on this machine's disk — but every
+ * screen that mentions storage says, in red, that Supabase was requested and the
+ * key was missing (`driverHealth()`), and Settings names the exact variable. A
+ * studio that refuses to open is a worse failure than one that tells you what to
+ * paste.
  */
 import path from "node:path";
 import type { BlobStore, DriverStatus, SnapshotStore } from "./types";
@@ -70,20 +78,61 @@ export function databaseDriverChoice(): DriverChoice {
   return choose(process.env.DATABASE_DRIVER);
 }
 
+/**
+ * What the configuration asked for vs what can actually run.
+ *
+ * `requested` is the env choice, `effective` is the driver in use. They differ
+ * only when Supabase was requested without credentials, which is exactly the
+ * situation a red banner has to explain.
+ */
+export interface DriverHealth {
+  ok: boolean;
+  requested: DriverChoice;
+  effective: DriverChoice;
+  /** Set when the request could not be honoured; the sentence to show a human. */
+  warning: string | null;
+}
+
+function healthFor(envName: string): DriverHealth {
+  const requested = choose(process.env[envName]);
+  const configured = supabaseConfig() !== null;
+  if (requested === "supabase" && !configured) {
+    return {
+      ok: false,
+      requested,
+      effective: "local",
+      warning: `${envName}=supabase was requested, but ${missingReason()} Until it is set, audio and projects are saved on this machine's disk — not in Supabase.`,
+    };
+  }
+  return { ok: true, requested, effective: requested, warning: null };
+}
+
+export function storageDriverHealth(): DriverHealth {
+  return healthFor("STORAGE_DRIVER");
+}
+
+export function databaseDriverHealth(): DriverHealth {
+  return healthFor("DATABASE_DRIVER");
+}
+
+/** Health of both seams — what `/api/system` and Settings show. */
+export function driverHealth(): { blobs: DriverHealth; database: DriverHealth; ok: boolean } {
+  const blobs = storageDriverHealth();
+  const database = databaseDriverHealth();
+  return { blobs, database, ok: blobs.ok && database.ok };
+}
+
 let blobCache: BlobStore | null = null;
 let snapshotCache: SnapshotStore | null = null;
 
 /** The blob store every audio/export read and write goes through. */
 export function blobStore(): BlobStore {
   if (blobCache) return blobCache;
-  const choice = storageDriverChoice();
+  // `effective`, not `requested`: a half-filled config keeps the studio usable
+  // and reports the problem through `driverHealth()`.
+  const choice = storageDriverHealth().effective;
   const config = supabaseConfig();
-  if (choice === "supabase") {
-    if (!config) {
-      throw new Error(
-        `STORAGE_DRIVER=supabase but Supabase is not configured. ${missingReason()}`,
-      );
-    }
+  if (choice === "supabase" && config) {
     blobCache = supabaseBlobStore(config);
   } else {
     blobCache = localBlobStore(dataDir());
@@ -94,14 +143,9 @@ export function blobStore(): BlobStore {
 /** The database the studio reads and writes. */
 export function snapshotStore(): SnapshotStore {
   if (snapshotCache) return snapshotCache;
-  const choice = databaseDriverChoice();
+  const choice = databaseDriverHealth().effective;
   const config = supabaseConfig();
-  if (choice === "supabase") {
-    if (!config) {
-      throw new Error(
-        `DATABASE_DRIVER=supabase but Supabase is not configured. ${missingReason()}`,
-      );
-    }
+  if (choice === "supabase" && config) {
     snapshotCache = supabaseSnapshotStore(config);
   } else {
     snapshotCache = localSnapshotStore(path.join(dataDir(), "db.json"));
@@ -132,20 +176,30 @@ function statusFor(kind: DriverChoice, label: string, envName: string): DriverSt
   };
 }
 
-/** What the Settings page and the API report about durability. */
-export function storageStatus(): { blobs: DriverStatus; database: DriverStatus } {
-  const blobsChoice = storageDriverChoice();
-  const dbChoice = databaseDriverChoice();
-  const blobsLabel = blobsChoice === "supabase" ? blobStore().label : "This machine's disk (.data)";
-  const dbLabel =
-    dbChoice === "supabase" ? snapshotStore().label : "This machine's disk (.data/db.json)";
+/**
+ * What the Settings page and the API report about durability.
+ *
+ * `warning` is the part that must never be dropped on the floor: it says that a
+ * Supabase driver was asked for and could not be started, so nobody reads
+ * "local" and assumes the choice was honoured.
+ */
+export function storageStatus(): {
+  blobs: DriverStatus & { warning: string | null };
+  database: DriverStatus & { warning: string | null };
+  warning: string | null;
+} {
+  const blobHealth = storageDriverHealth();
+  const dbHealth = databaseDriverHealth();
+  const blobs = statusFor(blobHealth.effective, blobStore().label, "STORAGE_DRIVER");
+  const database = statusFor(dbHealth.effective, snapshotStore().label, "DATABASE_DRIVER");
   return {
-    blobs: statusFor(blobsChoice, blobsLabel, "STORAGE_DRIVER"),
-    database: statusFor(dbChoice, dbLabel, "DATABASE_DRIVER"),
+    blobs: { ...blobs, warning: blobHealth.warning },
+    database: { ...database, warning: dbHealth.warning },
+    warning: blobHealth.warning ?? dbHealth.warning,
   };
 }
 
-/** True when audio and the database both leave this machine. */
+/** True when audio and the database both actually leave this machine. */
 export function durableStorage(): boolean {
-  return storageDriverChoice() === "supabase" && databaseDriverChoice() === "supabase";
+  return storageDriverHealth().effective === "supabase" && databaseDriverHealth().effective === "supabase";
 }

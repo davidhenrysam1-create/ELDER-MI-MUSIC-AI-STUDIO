@@ -363,6 +363,18 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="mt-3 space-y-2">
+            {system?.storageDrivers?.warning ? (
+              <div className="rounded-xl border border-rose-400/40 bg-rose-500/10 p-3 text-[10px] leading-relaxed text-rose-100">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Icon name="alert" size={12} /> Supabase was requested but did not start
+                </div>
+                <p className="mt-1">{system.storageDrivers.warning}</p>
+                <p className="mt-1 text-rose-100/80">
+                  Nothing is lost — the studio is working normally on this machine. Paste the missing
+                  value in <span className="mono">.env.local</span> and restart.
+                </p>
+              </div>
+            ) : null}
             {[
               { title: "Audio and exports", status: system?.storageDrivers?.blobs },
               { title: "Database (projects, accounts)", status: system?.storageDrivers?.database },

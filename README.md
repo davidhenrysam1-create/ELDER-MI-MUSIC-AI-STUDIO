@@ -318,7 +318,8 @@ already happened once in this project). The studio now has two storage drivers b
 knows where the bytes are, and Settings → *Data on this studio* prints which one is live and whether it
 is off this machine.
 
-To turn it on (about five minutes, free tier is enough):
+**For the bucket `tracks` / table `songs` pair, the exact steps are in [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md).**
+The generic version:
 
 1. Create a project at [supabase.com](https://supabase.com) and open **SQL Editor**:
 
@@ -341,6 +342,10 @@ To turn it on (about five minutes, free tier is enough):
    ```
 
 5. Restart the studio. Settings → Storage should now read *off this machine* for both rows.
+
+If the credentials are wrong or half-filled the studio keeps working on this machine's disk and Settings
+shows a **red banner** naming the missing variable — it never claims the data reached Supabase, and it
+never refuses to open because of a config mistake.
 
 Two honest notes: the database is stored as **one JSON document per studio** (the studio's data model),
 guarded by a revision number so two writes cannot silently overwrite each other — per-record tables are
