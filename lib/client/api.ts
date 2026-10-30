@@ -427,8 +427,22 @@ export const api = {
        */
       storageDrivers?: {
         durable: boolean;
-        blobs: { kind: "local" | "supabase"; label: string; durable: boolean; reason: string };
-        database: { kind: "local" | "supabase"; label: string; durable: boolean; reason: string };
+        /** Set when a requested driver could not start (missing credentials). */
+        warning?: string | null;
+        blobs: {
+          kind: "local" | "supabase";
+          label: string;
+          durable: boolean;
+          reason: string;
+          warning?: string | null;
+        };
+        database: {
+          kind: "local" | "supabase";
+          label: string;
+          durable: boolean;
+          reason: string;
+          warning?: string | null;
+        };
       };
       providers: {
         gemini: { configured: boolean; model: string };

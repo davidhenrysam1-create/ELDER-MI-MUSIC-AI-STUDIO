@@ -5,7 +5,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { localBlobStore, localSnapshotStore } from "@/lib/server/drivers/local";
 import { supabaseBlobStore, supabaseSnapshotStore } from "@/lib/server/drivers/supabase";
 import {
+  blobStore,
   databaseDriverChoice,
+  driverHealth,
+  durableStorage,
   resetDrivers,
   storageDriverChoice,
   storageStatus,
@@ -249,17 +252,49 @@ describe("driver selection", () => {
     expect(status.database.label).toContain("studio_docs");
   });
 
-  it("honours an explicit choice, and refuses to pretend when credentials are missing", () => {
+  it("honours an explicit 'local' even when Supabase is configured", () => {
     process.env.STORAGE_DRIVER = "local";
     process.env.SUPABASE_URL = "https://project.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
     resetDrivers();
     expect(storageDriverChoice()).toBe("local");
+    expect(storageStatus().blobs.kind).toBe("local");
+  });
 
-    delete process.env.SUPABASE_URL;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  it("falls back loudly when Supabase is requested but the key is missing", () => {
+    // The exact situation of a half-copied config file: the studio must keep
+    // working, and must say out loud that the choice was not honoured.
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.STORAGE_DRIVER = "supabase";
     process.env.DATABASE_DRIVER = "supabase";
     resetDrivers();
-    expect(() => storageStatus()).toThrow(/not configured/i);
+
+    const health = driverHealth();
+    expect(health.ok).toBe(false);
+    expect(health.blobs.requested).toBe("supabase");
+    expect(health.blobs.effective).toBe("local");
+
+    const status = storageStatus();
+    expect(status.blobs.kind).toBe("local");
+    expect(status.blobs.durable).toBe(false);
+    expect(status.warning).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+    expect(status.warning).toMatch(/not in Supabase/i);
+    // And it really does keep working on disk.
+    expect(() => blobStore()).not.toThrow();
+    expect(blobStore().kind).toBe("local");
+    expect(durableStorage()).toBe(false);
+  });
+
+  it("reports healthy once the key arrives", () => {
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+    process.env.STORAGE_DRIVER = "supabase";
+    process.env.DATABASE_DRIVER = "supabase";
+    resetDrivers();
+    const health = driverHealth();
+    expect(health.ok).toBe(true);
+    expect(health.blobs.effective).toBe("supabase");
+    expect(storageStatus().warning).toBeNull();
+    expect(durableStorage()).toBe(true);
   });
 });
