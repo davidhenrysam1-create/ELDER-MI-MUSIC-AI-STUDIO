@@ -352,8 +352,17 @@ guarded by a revision number so two writes cannot silently overwrite each other 
 a later step. And the service-role key bypasses row-level security, so it must only ever live in
 `.env.local`, never in the browser or the repository.
 
-Moving existing files up is a copy at the moment, not automatic: keep the old `.data/` folder as the
-source, and tell me if you want a one-click "copy everything to the bucket" tool.
+### Storage tools (Settings → Supabase connection)
+
+Two buttons, because these are the only two questions worth asking:
+
+| Button | What it does |
+| --- | --- |
+| **Test connection** | Runs the same calls the studio really makes — list the bucket, read one row of the table — and reports each one separately. Read-only; it never inserts anything. A `401` means the wrong key was pasted, a `404` means a name mismatch, and an unreachable project says so. |
+| **Copy existing files (dry run)** | Counts what is in `.data/` on this machine and shows the total, then offers a confirmed copy. Each file is reported; one failure does not stop the rest, and nothing in `.data/` is moved or deleted. |
+
+The copy uses the *raw* remote driver on purpose: if an upload fails it is reported as failed, never
+quietly written to this machine's disk and counted as success.
 
 ### "I sign in and it throws me back to the login screen"
 
