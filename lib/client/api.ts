@@ -212,6 +212,32 @@ export interface ShareSummary {
 export const api = {
   /* ---------------- accounts ---------------- */
   me: () => jsonFetch<MeResponse>("/api/auth/me"),
+  /** Where the bytes live, plus a live (read-only) Supabase connection test. */
+  storage: () =>
+    jsonFetch<{
+      drivers: {
+        warning: string | null;
+        blobs: { kind: "local" | "supabase"; label: string; durable: boolean; reason: string };
+        database: { kind: "local" | "supabase"; label: string; durable: boolean; reason: string };
+      };
+      connection: {
+        configured: boolean;
+        ok: boolean;
+        checks: { name: string; ok: boolean; detail: string }[];
+      };
+    }>("/api/storage"),
+  /** Copy this machine's audio and database to the configured remote store. */
+  migrateStorage: (confirm: boolean) =>
+    jsonFetch<{
+      dryRun: boolean;
+      blocked: string | null;
+      files: { key: string; bytes: number; ok: boolean; error?: string }[];
+      totalBytes: number;
+      database: { copied: boolean; detail: string };
+    }>("/api/storage", {
+      method: "POST",
+      body: JSON.stringify({ action: "migrate", confirm }),
+    }),
   signup: (body: { name: string; email: string; password: string }) =>
     jsonFetch<{ user: AccountUser }>("/api/auth/signup", {
       method: "POST",

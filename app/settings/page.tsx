@@ -16,6 +16,7 @@ import { useStudio } from "@/lib/client/studio";
 import { api, type ProviderCatalogue } from "@/lib/client/api";
 import { formatBytes } from "@/lib/format";
 import { CAPABILITIES, STATUS_LABEL, type CapabilityStatus } from "@/lib/capabilities";
+import { StorageTools } from "@/components/settings/StorageTools";
 import type { StudioSettings } from "@/lib/types";
 
 const STATUS_TONE: Record<CapabilityStatus, "success" | "warning" | "info" | "neutral"> = {
@@ -345,6 +346,8 @@ export default function SettingsPage() {
             </div>
           </div>
         </GlassCard>
+
+        <StorageTools />
 
         <GlassCard>
           <SectionHeading eyebrow="Storage" title="Data on this studio" />

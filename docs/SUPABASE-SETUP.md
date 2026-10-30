@@ -100,13 +100,29 @@ to open.
 
 ---
 
-## 5. Bring your existing audio up (optional)
+## 5. Check it, then bring your existing audio up
 
-Files recorded before this was configured are in `.data/`. They are not uploaded automatically. Either:
+Open **Settings → Supabase connection**:
 
-- keep `.data/` as the archive and carry on in Supabase with new material, or
-- ask for the one-click "copy everything to the bucket" tool — it does a dry-run count first and needs
-  the key from step 1 to be present.
+1. **Test connection** — three lines: credentials, bucket, table. Each one independent, each reporting the
+   provider's own message. Nothing is written.
+2. **Copy existing files (dry run)** — counts the audio and exports sitting in `.data/` and the size, without
+   touching anything.
+3. If the numbers look right, press **Copy N files to Supabase**. Each file is reported; a failure names the
+   file and the reason and the rest still go. `.data/` is never modified, so it stays as a backup.
+
+The copy deliberately bypasses the resilience wrapper, so an upload that fails is reported as failed
+instead of being written locally and counted as a success.
+
+### Reading the test
+
+| What you see | What it means |
+| --- | --- |
+| All three green | Storage and database both reachable with this key. Settings should now say *off this machine*. |
+| `Credentials` green, bucket 404 | The bucket name in `SUPABASE_BUCKET` does not match the dashboard. |
+| `Credentials` green, table 404 | The table is missing — run the SQL in step 2. |
+| `401` on either | The publishable/anon key was pasted instead of the secret key. |
+| `Could not reach Supabase` | No internet from this machine, or the project is paused. |
 
 ---
 

@@ -211,6 +211,24 @@ export function snapshotStore(): SnapshotStore {
   return snapshotCache;
 }
 
+/**
+ * The raw remote drivers, without the resilience wrapper.
+ *
+ * Used by the connection test and by the migration: both must report the truth
+ * about Supabase. A migration that "succeeded" by quietly writing to this
+ * machine's disk would be worse than one that fails, and a connection test that
+ * passed on a fallback would be a lie.
+ */
+export function rawBlobStore(): BlobStore | null {
+  const config = supabaseConfig();
+  return config ? supabaseBlobStore(config) : null;
+}
+
+export function rawSnapshotStore(): SnapshotStore | null {
+  const config = supabaseConfig();
+  return config ? supabaseSnapshotStore(config) : null;
+}
+
 /** Forget memoised drivers (tests change the environment between cases). */
 export function resetDrivers(): void {
   blobCache = null;
