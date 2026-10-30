@@ -63,7 +63,6 @@ which matters for a music app.
    |---|---|
    | `ADMIN_EMAIL` | your sign-in email |
    | `ADMIN_PASSWORD` | a password you choose (not your Supabase key) |
-   | `ADMIN_BOOTSTRAP_CODE` | a one-time code of your own, 8+ characters (e.g. `elder-mi-2026-setup`) |
    | `SUPABASE_URL` | from Supabase → Settings → API |
    | `SUPABASE_SECRET_KEY` | the **secret** key (starts `sb_secret_`), never the publishable one |
    | `NEXT_PUBLIC_SITE_URL` | leave blank for now — set it after step 8 |
@@ -89,25 +88,28 @@ Open these three, in order:
    "this machine's disk". If it says the disk is temporary, the Supabase values
    are wrong or the `songs` table does not exist yet.
 
-### Create your account on the new site (the step everyone misses)
+### Signing in for the first time
 
-A brand-new deployment has **no accounts yet**, so the sign-in page cannot let
-anyone in — it says *"The admin account has not been created yet."* That is not a
-fault; it is the door being locked until you open it once.
+There is **no code and nothing to look up**. The site asks for an email and a
+password, and those are exactly the two values you set in step 6:
 
-1. Open `https://<your-address>/admin-bootstrap`.
-2. Type the `ADMIN_BOOTSTRAP_CODE` you entered in step 6.
-3. You are signed in as the owner, with every role and the admin console.
+- **Email:** your `ADMIN_EMAIL`
+- **Password:** your `ADMIN_PASSWORD`
 
-From then on, sign in normally at `/login` with `ADMIN_EMAIL` and
-`ADMIN_PASSWORD` — the one-time code is spent (it is single-use and expires after
-24 hours).
+The first successful sign-in **creates** the owner account — with every role and
+the admin console — so a brand-new deployment needs no extra step at all. After
+that the stored password is what counts: change it in **My account** and the
+`ADMIN_PASSWORD` value stops being used for sign-in.
 
-> **If the free instance restarts before you finish**, the code is regenerated.
-> That is why `ADMIN_BOOTSTRAP_CODE` is set in the dashboard rather than read from
-> the log: it always works. And if Supabase is *not* configured, the account
-> itself lives on the temporary disk — another reason to finish the Supabase
-> setup before adding real work.
+**Why this also rescues a free deployment:** if the instance restarts and wipes
+its temporary data (no Supabase configured), the account disappears with it. Sign
+in again with the same two values and it is recreated instantly — your way in
+never breaks, even though the storage did.
+
+> If sign-in says *"No owner account can be created yet"*, the host is missing
+> `ADMIN_PASSWORD` (it must be 8+ characters). Add it in the **Environment** tab
+> and redeploy. If it says the password does not match, the value differs from
+> what you typed — check for a trailing space.
 
 ### Updating the site later
 
@@ -138,7 +140,6 @@ screen work fine.
    ```
    ADMIN_EMAIL            your sign-in email
    ADMIN_PASSWORD         a password you choose
-   ADMIN_BOOTSTRAP_CODE   a one-time code of your own, 8+ characters
    NEXT_PUBLIC_SITE_URL   https://<project>.vercel.app   (edit after the first deploy)
    SUPABASE_URL           https://<ref>.supabase.co
    SUPABASE_SECRET_KEY    sb_secret_...
@@ -205,7 +206,7 @@ public address.
 | Pages load, Settings says "temporary disk" | Supabase is not configured or the table is missing | Fill in all six Supabase variables, then run **Settings → Test connection** |
 | "Failed to fetch" right after waking | The free instance is still starting | Wait up to a minute and reload |
 | Sign-in loops back to the login page | The public address and `NEXT_PUBLIC_SITE_URL` disagree | Set `NEXT_PUBLIC_SITE_URL` to the exact address in the browser bar |
-| Login says *"The admin account has not been created yet"* | Normal on a fresh deployment | Open `/admin-bootstrap` once with your code (see above) |
+| Login says *"No owner account can be created yet"* | The host has no `ADMIN_PASSWORD`, so there is no password to check against | Add `ADMIN_PASSWORD` (8+ characters) to the host's environment and redeploy |
 | Signed in, then thrown out after a while | A free instance restarted, taking the temporary database with it — Supabase is not configured | Fill in the Supabase variables; Settings will confirm it |
 | Upload fails on Vercel with a size error | Vercel's 4.5 MB request limit | Use Render for uploads, or upload to Supabase directly |
 

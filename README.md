@@ -256,7 +256,7 @@ How it works, exactly:
   four roles and a public handle), so publishing, likes, follows, downloads and the admin console have a
   real account to attribute work to — nothing is faked as "anonymous";
 - sign-in screens are not merely unlinked, they **forward to the dashboard**, so a typed `/login`,
-  `/signup`, `/admin-bootstrap` or `/welcome` lands on `/`;
+  `/signup` or `/welcome` lands on `/`;
 - the "Sign out" button is hidden, since there is no door to go through.
 
 To go back to per-person accounts, set **`STUDIO_ACCOUNTS=on`** and restart. Nothing is deleted or
@@ -278,7 +278,6 @@ exports, voice profiles and share links.
 | `/account` | Change display name, roles, public handle, bio and AudioMack / Instagram / Facebook links; change password (signs every device out); see active sessions; verification status; close the account. |
 | `/u/<handle>` | Your **public page**: name, roles, bio and social links — never your email. No sign-in needed to view it. |
 | `/admin` | The admin console (see below). Appears in the navigation only for the admin account. |
-| `/admin-bootstrap` | One-time admin sign-in while Google is not configured. |
 
 ### Roles and dashboards
 
@@ -309,17 +308,15 @@ sign-in method, verification state, project/file/storage counts and live share l
 
 The admin account itself cannot be suspended or deleted, so the studio cannot lock itself out.
 
-**Getting in as admin** — three ways, in the order they become available:
+**Getting in as admin** — two ways:
 
-1. **Email + password** (easiest while Google is unconfigured). Put `ADMIN_PASSWORD` in `.env.local` and the
-   admin account adopts it on the next sign-in attempt, so `/login` works with your `ADMIN_EMAIL` address
-   and that password — across restarts. It seeds the stored scrypt hash **once**: change the password in
-   *My account* afterwards and the setup value stops working. The admin console shows a banner until you
-   do.
+1. **Email + password** (the default). `ADMIN_EMAIL` + `ADMIN_PASSWORD` *are* the owner account: on a
+   deployment where it does not exist yet — a fresh server, or a free host that wiped its temporary disk —
+   the first successful sign-in **creates** it with all four roles and the admin console. So there is
+   nothing else to do after deploying, and no code to read from a log. Afterwards the stored scrypt hash
+   is what counts, so change the password in *My account* and the setup value stops mattering.
 2. **Continue with Google** using the `ADMIN_EMAIL` address, once `GOOGLE_CLIENT_ID` and
    `GOOGLE_CLIENT_SECRET` are set.
-3. **One-time bootstrap code** printed in the terminal at start-up, entered at `/admin-bootstrap`
-   (single use, 24 hours; set `ADMIN_BOOTSTRAP_CODE` to choose your own).
 
 **No admin password is stored in this repository.** `ADMIN_PASSWORD` lives in your git-ignored
 `.env.local`; treat it as a way back in, not as the long-term password.
@@ -488,7 +485,6 @@ Copy `.env.example` to `.env.local`:
 | `STORAGE_DRIVER`, `DATABASE_DRIVER` | Optional. `local` or `supabase`. Unset means automatic: Supabase when configured, otherwise this machine's disk. |
 | `ADMIN_EMAIL` | **Required for admin access.** The one address that always has admin rights. Leave it empty and nobody can open `/admin`. |
 | `STUDIO_ACCOUNTS` | Optional. Leave unset for **open studio** (no sign-in screen, everything reachable as the owner). Set to `on` to restore the login screen, sign-up and per-person libraries. |
-| `ADMIN_BOOTSTRAP_CODE` | Optional. Fixed one-time admin code while Google is unconfigured; random and printed to the log if unset. |
 | `ADMIN_PASSWORD` | Optional (8+ chars). Seeds the admin's password once so `/login` works with `ADMIN_EMAIL` + this password; change it in My account afterwards. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Turns on **Continue with Google**. Add `/api/auth/google/callback` as an authorised redirect URI (see below). |
 | `GOOGLE_REDIRECT_URI` | Optional. Pins the redirect URI when it differs from `NEXT_PUBLIC_SITE_URL`. |
@@ -648,10 +644,11 @@ Covered (`tests/`):
 - Roles: the role → studio/route map, that a missing role means no access rather than full access,
   that the admin bypasses every gate, and that the navigation hides what a role cannot open while a
   typed URL gets an explanation instead of the tools.
-- Admin and identity: the admin address cannot be claimed or signed into with a password, only
-  `ADMIN_EMAIL` is admin, the admin cannot suspend itself, suspending ends the account's sessions and
-  refuses sign-in, the bootstrap code is single-use and refused once Google is configured, and the
-  admin console refuses non-admins (403) and anonymous callers (401).
+- Admin and identity: the admin address cannot be claimed by a stranger at `/signup`, only
+  `ADMIN_EMAIL` is admin, the owner account is created from `ADMIN_EMAIL` + `ADMIN_PASSWORD` on the first
+  successful sign-in (and not for any other address or a wrong password), the admin cannot suspend
+  itself, suspending ends the account's sessions and refuses sign-in, and the admin console refuses
+  non-admins (403) and anonymous callers (401).
 - Public profiles: only the holder's handle resolves, emails never appear in the payload, and a
   suspended profile disappears.
 - Google and verification: first sign-in creates a verified account, repeat sign-ins link instead of

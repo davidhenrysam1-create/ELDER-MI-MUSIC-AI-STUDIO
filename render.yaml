@@ -37,18 +37,12 @@ services:
       - key: STUDIO_ACCOUNTS
         value: "on"
       # Set in the Render dashboard (marked as secrets / entered by you):
-      # ADMIN_EMAIL is your sign-in address, ADMIN_PASSWORD your password.
+      # ADMIN_EMAIL + ADMIN_PASSWORD are the owner sign-in: on the first
+      # successful sign-in the account is created automatically, so nothing else
+      # is needed — not even a code.
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD
-        sync: false
-      # A one-time code (8+ characters, your choice) you type once at
-      # /admin-bootstrap to create the owner account on the new site. Because
-      # free instances can restart at any time, keeping it set in the dashboard
-      # means the owner account can always be re-created if the data is ever
-      # wiped — the app otherwise prints a random code to the log, which is hard
-      # to reach on a small phone.
-      - key: ADMIN_BOOTSTRAP_CODE
         sync: false
       # The public address of the deployment, e.g. https://elder-mi-music-ai-studio.onrender.com
       # Used for share links and emails. Fill it in after the first deploy.

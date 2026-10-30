@@ -38,11 +38,6 @@ const ENV_VARS = [
       "The one address with admin rights. Rights are derived from it on every request, never stored, so it cannot be granted to another account. Empty means nobody can open /admin.",
   },
   {
-    key: "ADMIN_BOOTSTRAP_CODE",
-    detail:
-      "Optional. A fixed one-time code for /admin-bootstrap while Google is unconfigured (single use, 24 h). If unset, a random code is printed in the server log at start-up.",
-  },
-  {
     key: "ADMIN_PASSWORD",
     detail:
       "Optional, 8+ characters. Seeds the admin password once so /login works with ADMIN_EMAIL and this value, even after a restart. Change it in My account; the setup value then stops working. Keep it in .env.local, never in git.",
@@ -345,11 +340,12 @@ export default function DocsPage() {
             verify, suspend (which ends that account&apos;s sessions at once) or delete an account.
           </li>
           <li>
-            <span className="text-softwhite">Getting in as admin:</span> email + password with{" "}
-            <span className="mono">ADMIN_PASSWORD</span> from <span className="mono">.env.local</span>{" "}
-            (change it in My account once you are in), Google sign-in with that address, or — while Google
-            is unconfigured — the one-time code printed in the server log at{" "}
-            <span className="mono">/admin-bootstrap</span>. No admin password lives in the repository.
+            <span className="text-softwhite">Getting in as admin:</span> email + password — the address
+            in <span className="mono">ADMIN_EMAIL</span> and the password in{" "}
+            <span className="mono">ADMIN_PASSWORD</span>. The owner account is created from those two on
+            the first successful sign-in, so a new deployment (or a free host that wiped its disk) needs
+            nothing else. Change the password in My account once you are in, or Google sign-in with that
+            address. No admin password lives in the repository.
           </li>
           <li>
             <span className="text-softwhite">Session cookies:</span> on plain HTTP the session cookie is{" "}
@@ -398,8 +394,8 @@ export default function DocsPage() {
           with all four roles and a public handle, so every studio, project, share link, public page and
           the admin console are reachable immediately — and publishing, likes, follows and downloads all
           have a real account behind them. <span className="mono">/login</span>,{" "}
-          <span className="mono">/signup</span>, <span className="mono">/admin-bootstrap</span> and{" "}
-          <span className="mono">/welcome</span> forward to the dashboard, and Sign out is hidden.
+          <span className="mono">/signup</span> and <span className="mono">/welcome</span> forward to the
+          dashboard, and Sign out is hidden.
         </p>
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
           To return to per-person accounts, set <span className="mono">STUDIO_ACCOUNTS=on</span> and

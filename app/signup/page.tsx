@@ -15,7 +15,7 @@
  *
  * The first account becomes the studio owner and adopts projects saved before
  * accounts existed. The admin address is reserved and refused here — it signs in
- * with Google, its own password, or a bootstrap code.
+ * with Google, or with its own password.
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";

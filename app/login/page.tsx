@@ -3,14 +3,14 @@
 /**
  * Sign in.
  *
- * Three ways in, each shown honestly:
+ * Two ways in, each shown honestly:
  *  - **Continue with Google** — always a real, clickable button. It is a one-tap
  *    sign-in as soon as `GOOGLE_CLIENT_ID` / `SECRET` exist, and until then it
  *    opens the one-time set-up panel (`components/auth/GoogleButton.tsx`)
  *    instead of pretending or sending anyone to a Google error page;
- *  - email + password for ordinary accounts;
- *  - a one-time **admin bootstrap code** while Google is not configured yet, so
- *    the owner is never locked out of their own studio.
+ *  - **email + password**. For the owner this is simply `ADMIN_EMAIL` and
+ *    `ADMIN_PASSWORD`: the account is created from them on the first successful
+ *    sign-in, so there is no one-time code to look up in a server log.
  *
  * It also detects the one failure that looks like a wrong password but is not:
  * a browser that refuses to store the session cookie (a third-party iframe with
@@ -108,8 +108,8 @@ function LoginForm() {
   };
 
   const googleReady = config?.google?.configured === true;
-  const bootstrapAvailable = config?.adminSignIn?.bootstrapAvailable === true;
   const adminPasswordReady = config?.adminSignIn?.passwordConfigured === true;
+  const adminExists = config?.adminSignIn?.adminExists === true;
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
@@ -239,40 +239,34 @@ function LoginForm() {
           . The first account on a new studio owns the projects already saved here.
         </p>
 
-        {/* Admin */}
+        {/*
+          The owner's way in, stated plainly. No one-time code: ADMIN_EMAIL plus
+          ADMIN_PASSWORD is the account, and it is created on first sign-in.
+        */}
         <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-2.5">
           <div className="flex items-center gap-1.5 text-[10px] font-semibold text-softwhite">
             <Icon name="lock" size={11} className="text-amber-300" /> Studio admin
           </div>
           {adminPasswordReady ? (
             <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
-              Sign in above with the admin email and the password from{" "}
-              <span className="mono">ADMIN_PASSWORD</span>. Once you are in, change it in My account —
-              the setup password is only a way back in.
+              Sign in above with <span className="mono">ADMIN_EMAIL</span> and{" "}
+              <span className="mono">ADMIN_PASSWORD</span> — the two values set on the server.{" "}
+              {adminExists
+                ? "Once you are in, change the password in My account."
+                : "The owner account is created on the first successful sign-in."}
             </p>
-          ) : null}
-
+          ) : (
+            <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
+              No <span className="mono">ADMIN_PASSWORD</span> is set on this server yet. Add it to the
+              host&apos;s environment settings (8+ characters), then sign in with that password.
+            </p>
+          )}
           {googleReady ? (
             <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
               The admin account also signs in with Google, using the address in{" "}
               <span className="mono">ADMIN_EMAIL</span>.
             </p>
-          ) : (
-            <p className="mt-0.5 text-[9px] leading-relaxed text-muted">
-              Google sign-in is not configured yet, so besides a password the admin has a one-time
-              bootstrap code.{" "}
-              {bootstrapAvailable ? (
-                <Link href="/admin-bootstrap" className="text-cyan-200 underline hover:text-white">
-                  Enter the bootstrap code →
-                </Link>
-              ) : (
-                <span>
-                  No code is active right now — restart the server (or set{" "}
-                  <span className="mono">ADMIN_BOOTSTRAP_CODE</span>) to issue one.
-                </span>
-              )}
-            </p>
-          )}
+          ) : null}
         </div>
 
         <p className="mt-2 text-center text-[9px] leading-relaxed text-muted/60">

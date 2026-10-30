@@ -167,7 +167,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How do I sign in as the studio admin?",
-    a: "The simplest way is email and password: set ADMIN_PASSWORD in .env.local (8+ characters), restart the studio, then sign in at /login with your ADMIN_EMAIL address and that password. The setup password is only a way back in — change it in My account once you are inside, and the admin console banner will disappear. The other two routes are Continue with Google with the ADMIN_EMAIL address (once GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET exist) and the one-time bootstrap code printed in the terminal, entered at /admin-bootstrap (single use, 24 hours). No admin password is stored in the repository, and the admin can never be suspended or deleted from the console.",
+    a: "With your email and password. Set ADMIN_EMAIL and ADMIN_PASSWORD in .env.local (8+ characters) — or in your host's environment settings — then sign in at /login with exactly those two values. On a fresh deployment the owner account does not exist yet, so the first successful sign-in creates it with all four roles and the admin console; after that the stored password is what counts, so change it in My account and the setup value stops mattering. If you would rather not keep a password on the server, Continue with Google works with the ADMIN_EMAIL address once GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET exist. There is no one-time code to find. No admin password is stored in the repository, and the admin can never be suspended or deleted from the console.",
   },
   {
     q: "Another account joined — what can the admin do about it?",

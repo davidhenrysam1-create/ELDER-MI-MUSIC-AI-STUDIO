@@ -4,9 +4,8 @@ import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Roles, the admin account, Google sign-in, the bootstrap code and email
- * verification — all against a real temporary data directory, with no mocks of
- * the auth module itself.
+ * Roles, the owner account, Google sign-in and email verification — all against a
+ * real temporary data directory, with no mocks of the auth module itself.
  *
  * The point of most of these tests is the *refusal*: an ordinary account must not
  * become admin, a suspended account must lose its sessions, the admin address
@@ -24,7 +23,6 @@ beforeAll(async () => {
   tmpDir = await mkdtemp(path.join(os.tmpdir(), "eldermi-identity-"));
   process.env.DATA_DIR = tmpDir;
   process.env.ADMIN_EMAIL = ADMIN;
-  process.env.ADMIN_BOOTSTRAP_CODE = "TEST-BOOTSTRAP-CODE";
   delete process.env.ALLOW_SIGNUP;
   delete process.env.GOOGLE_CLIENT_ID;
   delete process.env.GOOGLE_CLIENT_SECRET;
@@ -35,7 +33,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   delete process.env.ADMIN_EMAIL;
-  delete process.env.ADMIN_BOOTSTRAP_CODE;
+  delete process.env.ADMIN_PASSWORD;
   await rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -157,12 +155,11 @@ describe("the admin account", () => {
     ).rejects.toThrow(/reserved for the studio admin/i);
   });
 
-  it("cannot be signed into with a password", async () => {
-    // Either the address is unknown yet (generic 401) or the admin exists without
-    // a password: both paths end in failure, which is the requirement — the admin
-    // signs in with Google or the bootstrap code, never a password.
+  it("cannot be signed into with an arbitrary password", async () => {
+    // No ADMIN_PASSWORD is set here, so there is nothing to create the account
+    // from: signing in as the owner must fail and say what is missing.
     await expect(auth.login({ email: ADMIN, password: PASSWORD })).rejects.toThrow(
-      /Email or password is incorrect|Google|admin/i,
+      /No owner account can be created yet/i,
     );
   });
 
@@ -220,48 +217,85 @@ describe("suspension", () => {
   });
 });
 
-describe("bootstrap code", () => {
-  it("refuses a wrong code", async () => {
-    await expect(auth.redeemBootstrapCode("NOT-THE-CODE", "vitest")).rejects.toThrow(/not correct/i);
+describe("the owner account on a new deployment", () => {
+  /*
+   * The promise being pinned: ADMIN_EMAIL + ADMIN_PASSWORD are all the owner
+   * needs. A fresh deployment has no accounts at all, and a free host can wipe
+   * the database at any restart — in both cases the first successful sign-in
+   * must create the account rather than asking for a code from a log.
+   */
+  const OWNER = "owner-password-123";
+
+  /** Remove the owner account, so each test starts from an empty deployment. */
+  async function wipeOwner() {
+    const existing = (await auth.listUsers()).find((user) => user.email === ADMIN);
+    if (existing) await auth.deleteUser(existing.id);
+  }
+
+  afterAll(async () => {
+    delete process.env.ADMIN_PASSWORD;
+    await wipeOwner();
   });
 
-  it("signs the admin in once, with every role", async () => {
-    const user = await auth.redeemBootstrapCode("TEST-BOOTSTRAP-CODE", "vitest");
-    expect(user.isAdmin).toBe(true);
-    expect(user.roles).toEqual(["artist", "producer", "engineer", "promoter"]);
-    // A bootstrap admin has no password at all.
-    expect(user.provider).toBe("bootstrap");
-  });
-
-  it("refuses the same code a second time", async () => {
-    await expect(auth.redeemBootstrapCode("TEST-BOOTSTRAP-CODE", "vitest")).rejects.toThrow(
-      /No bootstrap code is active|not correct/i,
+  it("refuses, and names the missing variable, when ADMIN_PASSWORD is unset", async () => {
+    await wipeOwner();
+    delete process.env.ADMIN_PASSWORD;
+    await expect(auth.login({ email: ADMIN, password: OWNER })).rejects.toThrow(
+      /No owner account can be created yet/i,
     );
   });
 
-  it("refuses once Google is configured", async () => {
-    process.env.GOOGLE_CLIENT_ID = "client";
-    process.env.GOOGLE_CLIENT_SECRET = "secret";
-    try {
-      expect(auth.googleConfigured()).toBe(true);
-      await expect(auth.redeemBootstrapCode("TEST-BOOTSTRAP-CODE", "vitest")).rejects.toThrow(
-        /Google sign-in is configured/i,
-      );
-      expect(auth.currentBootstrapCode()).toBeNull();
-    } finally {
-      delete process.env.GOOGLE_CLIENT_ID;
-      delete process.env.GOOGLE_CLIENT_SECRET;
-    }
+  it("refuses a password that is not ADMIN_PASSWORD", async () => {
+    process.env.ADMIN_PASSWORD = OWNER;
+    await expect(auth.login({ email: ADMIN, password: "definitely-not-it" })).rejects.toThrow(
+      /does not match ADMIN_PASSWORD/i,
+    );
+    // ...and nothing was created by the failed attempt.
+    const users = await auth.listUsers();
+    expect(users.some((user) => user.email === ADMIN)).toBe(false);
   });
 
-  it("reports availability to the sign-in screen without leaking the code", async () => {
+  it("creates the owner from the configured email and password, with every role", async () => {
+    process.env.ADMIN_PASSWORD = OWNER;
+    const user = await auth.login({ email: ADMIN, password: OWNER }, "vitest");
+    expect(user.email).toBe(ADMIN);
+    expect(user.isAdmin).toBe(true);
+    expect(user.roles).toEqual(["artist", "producer", "engineer", "promoter"]);
+    expect(user.emailVerified).toBe(true);
+    // Created with a real password from the start — not a passwordless account.
+    expect(user.provider).toBe("password");
+    expect(user.passwordSeeded).toBe(true);
+  });
+
+  it("signs the same owner in again, and never creates a second account", async () => {
+    process.env.ADMIN_PASSWORD = OWNER;
+    const first = await auth.login({ email: ADMIN, password: OWNER }, "vitest");
+    const second = await auth.login({ email: ADMIN, password: OWNER }, "vitest");
+    expect(second.id).toBe(first.id);
+    const admins = (await auth.listUsers()).filter((user) => user.email === ADMIN);
+    expect(admins).toHaveLength(1);
+  });
+
+  it("creates nothing for another address that happens to use the same password", async () => {
+    process.env.ADMIN_PASSWORD = OWNER;
+    await expect(auth.login({ email: "stranger@studio.test", password: OWNER })).rejects.toThrow(
+      /incorrect/i,
+    );
+    const users = await auth.listUsers();
+    expect(users.some((user) => user.email === "stranger@studio.test")).toBe(false);
+  });
+
+  it("tells the sign-in screen what is set, without leaking the address or password", async () => {
     const state = await auth.adminSignInState();
     // The address is masked, because /api/auth/me is readable without signing in.
     expect(state.adminEmailMasked).not.toBe(ADMIN);
     expect(state.adminEmailMasked?.endsWith("@eldermi.test")).toBe(true);
     expect(state.adminEmailMasked?.startsWith("a")).toBe(true);
+    expect(state.adminExists).toBe(true);
+    expect(state.passwordConfigured).toBe(true);
     expect(state.googleConfigured).toBe(false);
-    expect(JSON.stringify(state)).not.toContain("TEST-BOOTSTRAP-CODE");
+    expect(JSON.stringify(state)).not.toContain(OWNER);
+    expect(JSON.stringify(state)).not.toContain(ADMIN);
   });
 });
 
@@ -378,7 +412,7 @@ describe("admin setup password (ADMIN_PASSWORD)", () => {
   it("lets the admin sign in with email + password and marks it as seeded", async () => {
     process.env.ADMIN_PASSWORD = SETUP;
     try {
-      // The admin exists from the bootstrap test above and has no password yet.
+      // A fresh deployment again: the first sign-in creates the owner account.
       const user = await auth.login({ email: ADMIN, password: SETUP }, "vitest");
       expect(user.isAdmin).toBe(true);
       expect(user.passwordSeeded).toBe(true);
@@ -408,25 +442,21 @@ describe("admin setup password (ADMIN_PASSWORD)", () => {
     expect(after.passwordSeeded).toBe(false);
   });
 
-  it("seeds the password when the bootstrap code creates the admin", async () => {
-    // A clean slate: remove the admin account, then redeem a fresh code with a
-    // setup password configured, exactly as a new deployment would.
-    const admin = (await auth.listUsers()).find((entry) => entry.email === ADMIN)!;
-    await auth.deleteUser(admin.id);
+  it("gives a Google-created admin the setup password on its next sign-in", async () => {
+    // A clean slate: remove the owner, then let Google create it without a
+    // password — exactly what happens when the owner first uses "Continue with
+    // Google". ADMIN_PASSWORD must become their password afterwards, once.
+    const owner = (await auth.listUsers()).find((entry) => entry.email === ADMIN);
+    if (owner) await auth.deleteUser(owner.id);
+    await auth.signInWithGoogle({ sub: "owner-google", email: ADMIN, name: "Studio admin" }, "vitest");
 
-    process.env.ADMIN_PASSWORD = "seeded-by-bootstrap";
-    process.env.ADMIN_BOOTSTRAP_CODE = "FRESH-CODE-123";
+    process.env.ADMIN_PASSWORD = "seeded-after-google";
     try {
-      // Forget the code used earlier in this file, then issue a fresh one.
-      auth.__resetBootstrapForTests();
-      auth.currentBootstrapCode();
-      const created = await auth.redeemBootstrapCode("FRESH-CODE-123", "vitest");
-      expect(created.passwordSeeded).toBe(true);
-      const signedIn = await auth.login({ email: ADMIN, password: "seeded-by-bootstrap" }, "vitest");
+      const signedIn = await auth.login({ email: ADMIN, password: "seeded-after-google" }, "vitest");
       expect(signedIn.isAdmin).toBe(true);
+      expect(signedIn.passwordSeeded).toBe(true);
     } finally {
       delete process.env.ADMIN_PASSWORD;
-      process.env.ADMIN_BOOTSTRAP_CODE = "TEST-BOOTSTRAP-CODE";
     }
   });
 });

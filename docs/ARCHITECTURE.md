@@ -241,8 +241,8 @@ the sentence to act on. Nothing is inferred from `NODE_ENV`.
   sign-up uses, so nothing is stranded.
 - Because every guard (`guard`, `guardStudio`, `guardAnyStudio`, `adminGuard`) funnels through
   `requireUser()`, all of them pass in open mode without a single condition inside the routes.
-- `middleware.ts` skips the session check and forwards `/login`, `/signup`, `/admin-bootstrap` and
-  `/welcome` to `/`. That is what removes the sign-in screen rather than merely hiding its link.
+- `middleware.ts` skips the session check and forwards `/login`, `/signup` and `/welcome` to `/`. That is
+  what removes the sign-in screen rather than merely hiding its link.
 - `/api/auth/me` reports `openStudio: true`; the shell hides "Sign out" and labels the account entry
   *Studio profile*.
 
@@ -289,7 +289,7 @@ accounts. Reckless auto-linking is avoided because Google has already proven the
 
 **Admin setup password.** `ADMIN_PASSWORD` (≥ 8 characters, read from the environment) seeds the admin's
 scrypt hash exactly once: `seedAdminPassword()` runs on every admin sign-in attempt and only fills an
-**empty** hash, and `redeemBootstrapCode()` stores it when it creates the account. The stored hash is then
+**empty** hash, and `provisionAdminOnFirstSignIn()` stores it when it creates the account. The stored hash is then
 authoritative — `changePassword()` replaces it and clears `passwordSeeded`, which is what drives the
 "still using the setup password" banner in `/admin`. The value never appears in the repository.
 
@@ -309,9 +309,15 @@ suspended and Google-only addresses so it cannot enumerate accounts, and it neve
 mail provider exists — it returns the provider's own reason instead. A successful reset stores a fresh
 scrypt hash, clears `passwordSeeded`, burns the token and deletes every session for that account.
 
-**Bootstrap code** exists only so the owner can reach `/admin` before Google is configured: a random code
-(or `ADMIN_BOOTSTRAP_CODE`), hashed with SHA-256, single use, 24-hour expiry, printed to the server log and
-never emailed. It is refused outright once Google is configured. No admin password is stored anywhere.
+**The owner account** is provisioned by `login()` from the operator's own two values. When the address is
+`ADMIN_EMAIL`, no account exists yet and the supplied password matches `ADMIN_PASSWORD` (compared in
+constant time over SHA-256 digests), `provisionAdminOnFirstSignIn()` creates the account with every role,
+the `admin` handle, a verified address and a scrypt hash of that password, then claims any orphaned work.
+This is what makes a fresh deployment — or a free host that wiped its temporary disk — sign-in-able with
+nothing but the email and password in the environment. It is not a bypass: the password must still match
+the operator's secret, and no account is created for any other address. An existing account is never
+rewritten; `seedAdminPassword()` only fills a missing hash, once. No admin password is stored anywhere in
+the repository.
 
 **Email** (`lib/server/email.ts`) is a single Resend HTTPS POST behind `emailConfigured()`. With no key or
 no `EMAIL_FROM` it returns `{ sent: false, reason }`; `/api/auth/verify/send` forwards that reason to the
@@ -358,7 +364,6 @@ into a release response, and `/u/<handle>` never includes an email address.
 | --- | --- | --- |
 | `/api/auth/me` | GET, PATCH | session view; PATCH name/handle/bio/links/roles |
 | `/api/auth/google/start`, `/api/auth/google/callback` | GET | Google OAuth; `start` redirects with an honest error when unconfigured. The `state` cookie shares the session cookie's attributes, or the callback inside a frame would fail with "attempt expired" |
-| `/api/auth/bootstrap` | POST | one-time admin code |
 | `/api/auth/onboarding` | POST | save roles (and handle) from `/welcome` |
 | `/api/auth/verify/send`, `/api/auth/verify/confirm` | POST, GET | issue a token / confirm the link |
 | `/api/admin/users` | GET | admin: all accounts plus per-account stats |
