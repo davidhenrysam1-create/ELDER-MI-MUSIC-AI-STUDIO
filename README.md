@@ -30,10 +30,13 @@ Git history, and the architecture/plan documents are kept in [`plan_app.txt`](./
 ## 2. Quick start
 
 ```bash
-npm ci                         # Node 20.9+ (see .nvmrc)
+npm ci                         # Node 20.9+ (see .nvmrc); uses the committed package-lock.json
 cp .env.example .env.local     # optional: add Gemini and Supabase keys
 npm run dev                    # http://localhost:3000
 ```
+
+The lockfile is committed on purpose: `npm ci` installs exactly the versions that
+were tested, on every machine, instead of resolving new ones each time.
 
 The dev server binds to `0.0.0.0:3000`. Private audio and the project index live in `./.data`
 (created automatically, git-ignored).
@@ -50,6 +53,21 @@ npm start
 ```bash
 docker compose up -d           # http://localhost:3000, data in a named volume
 ```
+
+### A free public link (for testing, no server to look after)
+
+[`docs/HOST-FREE.md`](docs/HOST-FREE.md) walks through it click by click, in
+about five minutes, at no cost:
+
+- **Render** — recommended: a normal container with **no upload size limit**, so
+  music actually works. Sleeps after ~15 minutes idle, wakes in ~50 seconds.
+- **Vercel** — deploys in about a minute and is ideal for showing the interface,
+  but its **~4.5 MB request limit** will reject full songs and stems.
+
+Both are free and need no card. Neither keeps files on its own disk (free tiers
+have none), so point them at **Supabase** — the app is explicit about this: if it
+is not configured, Settings says the disk is temporary instead of implying your
+uploads are safe.
 
 ### Where to run it — one guide, five ways
 
@@ -76,7 +94,8 @@ is on this machine or somewhere durable, and names the variable to set.
 [`docs/ci/ci.yml`](docs/ci/ci.yml) proves a clean clone works, on every push and pull request:
 
 - **Ubuntu (Node 20 & 22), macOS (22), Windows (22)** — `npm ci` → typecheck → tests → production build.
-- **Docker** — builds the image, starts it, and fails unless the studio answers `/login` with `200`.
+- **Docker** — builds the image, starts it, and fails unless `/api/health` reports `{"ok":true}`
+  (the same probe Render and the Dockerfile's `HEALTHCHECK` use).
 
 **One-time activation (30 seconds):** copy that file to `.github/workflows/ci.yml` — via GitHub's
 *Add file → Create new file*, or `mkdir -p .github/workflows && cp docs/ci/ci.yml .github/workflows/ci.yml`.

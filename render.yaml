@@ -1,21 +1,60 @@
-# Render blueprint — a public web version with a real disk, which is what the
-# audio uploads need. Import this repository at render.com → New → Blueprint.
+# Render blueprint — the quickest FREE public web version for testing.
+#
+# How to use it (no coding, about 5 minutes):
+#   render.com → sign in with GitHub → New + → Blueprint → pick this repository
+#   → Apply. Render reads this file and creates the service.
+#
+# Why the free plan:
+#   It costs nothing and gives a public https://<name>.onrender.com address.
+#   Trade-offs (documented in docs/HOST-FREE.md, not hidden):
+#     - the service sleeps after ~15 minutes idle; the next visit takes ~50s
+#     - free instances have no persistent disk, so the app MUST use Supabase for
+#       storage. Without Supabase, files land in the temporary container disk and
+#       vanish on the next restart — Settings says so plainly.
+#     - 512 MB RAM / shared CPU: fine for testing, not for many users at once.
+#
+# Upgrading later is a plan change in the dashboard: switch to Starter and add
+# the disk block at the bottom of this file (it is already written, commented).
 services:
   - type: web
     name: elder-mi-music-ai-studio
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
-    healthCheckPath: /login
+    # `free` is the no-card tier. Change to `starter` when you want a disk.
+    plan: free
+    region: frankfurt
+    # /api/health answers 200 without touching the database, so a Supabase outage
+    # never makes Render believe the app itself is down.
+    healthCheckPath: /api/health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATA_DIR
-        value: /app/.data
-      # Set these in the Render dashboard (they are secrets):
+      # Keep the studio closed to strangers on a public URL: with
+      # STUDIO_ACCOUNTS=on the login screen is back and visitors cannot reach
+      # your projects or admin settings. Remove this line only if you want the
+      # open studio (anyone with the link is you).
+      - key: STUDIO_ACCOUNTS
+        value: "on"
+      # Set in the Render dashboard (marked as secrets / entered by you):
+      # ADMIN_EMAIL is your sign-in address, ADMIN_PASSWORD your password.
       - key: ADMIN_EMAIL
         sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # A one-time code (8+ characters, your choice) you type once at
+      # /admin-bootstrap to create the owner account on the new site. Because
+      # free instances can restart at any time, keeping it set in the dashboard
+      # means the owner account can always be re-created if the data is ever
+      # wiped — the app otherwise prints a random code to the log, which is hard
+      # to reach on a small phone.
+      - key: ADMIN_BOOTSTRAP_CODE
+        sync: false
+      # The public address of the deployment, e.g. https://elder-mi-music-ai-studio.onrender.com
+      # Used for share links and emails. Fill it in after the first deploy.
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      # Supabase keeps the music and the database on the free tier.
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SECRET_KEY
@@ -28,7 +67,21 @@ services:
         value: supabase
       - key: DATABASE_DRIVER
         value: supabase
-    disk:
-      name: studio-data
-      mountPath: /app/.data
-      sizeGB: 1
+      # Optional: Google sign-in, email, and Gemini prompts.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+    # ---------------------------------------------------------------------
+    # PAID ONLY. Free instances cannot attach a disk; uncomment both the plan
+    # change above (`plan: starter`) and this block if you would rather keep
+    # audio on Render's own disk instead of Supabase.
+    # ---------------------------------------------------------------------
+    # disk:
+    #   name: studio-data
+    #   mountPath: /app/.data
+    #   sizeGB: 1

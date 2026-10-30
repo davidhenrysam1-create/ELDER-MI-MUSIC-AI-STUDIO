@@ -68,6 +68,18 @@ const PUBLIC_FILES = [
  */
 const PUBLIC_API = ["/api/auth/", "/api/share/", "/api/profile/", "/api/releases", "/api/creators"];
 
+/**
+ * The liveness probe, reachable no matter how the deployment is locked down.
+ *
+ * A hosting platform's health check (Render, Docker, an uptime monitor) cannot
+ * sign in and sends no cookie, so anything gated would answer `401` and the
+ * platform would declare a perfectly healthy app dead — restart-looping it, or
+ * refusing to send traffic. `/api/health` therefore bypasses both the optional
+ * studio password and the session check. It returns only `{ok:true}`, a version
+ * string and an uptime counter: nothing that helps an attacker.
+ */
+const HEALTH_PATH = "/api/health";
+
 function safeEqual(a: string, b: string) {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -159,6 +171,10 @@ function isPublic(pathname: string): boolean {
 }
 
 export function middleware(request: NextRequest) {
+  // Checked first: a platform's probe must succeed even when the whole site is
+  // behind the optional studio password.
+  if (request.nextUrl.pathname === HEALTH_PATH) return NextResponse.next();
+
   if (!basicAuthOk(request)) {
     return new NextResponse("Elder Mi Music AI Studio — authentication required.", {
       status: 401,

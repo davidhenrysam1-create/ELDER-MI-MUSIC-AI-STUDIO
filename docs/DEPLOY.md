@@ -9,6 +9,7 @@ or **a public web address** other people can open.
 | Any machine, no Node | [B · Docker](#b--any-machine-docker) | Docker | If you mount the volume |
 | A public web address, uploads work | [C · Render](#c--public-web-version-render) | free Render account + Supabase | Yes, with Supabase |
 | A public web address, fast to set up | [D · Vercel](#d--vercel-quick-public-address) | free Vercel + Supabase | Yes, with Supabase — but uploads are capped |
+| A free public link, step by step | [HOST-FREE.md](HOST-FREE.md) | nothing else | Yes, with Supabase |
 | Google Cloud / an AI stack | [E · Cloud Run](#e--google-cloud-run) | Google Cloud project + Supabase | Yes, with Supabase |
 | Phone or tablet | [F · Install as an app](#f--install-as-an-app-android-ios) | any of the above | Same as the host |
 
@@ -71,20 +72,30 @@ The image runs as a non-root user, and `docker ps` shows `healthy` once the stud
 
 ## C · Public web version (Render)
 
-The best free-ish option if you want people to upload audio, because a container has no request-size
-ceiling and Render can attach a real disk.
+The best option if you want people to upload audio, because a container has no request-size ceiling.
+
+`render.yaml` ships on the **free** plan — no card, public HTTPS, no upload cap. Free instances have no
+disk and sleep after ~15 minutes idle, so **Supabase holds the music** and the first visit after a quiet
+spell takes ~50 seconds. That trade-off is the price of zero cost; the click-by-click version is in
+[`HOST-FREE.md`](HOST-FREE.md).
 
 1. Push this repository to GitHub (already done if you cloned it).
 2. [render.com](https://render.com) → **New → Blueprint** → pick the repository. `render.yaml` describes
-   everything: Docker build, health check, a 1 GB disk at `/app/.data`.
+   everything: Docker build, `/api/health` health check, the free plan, and the variables to fill in.
 3. In the service's **Environment** tab set the secrets it asks for:
-   `ADMIN_EMAIL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`.
+   `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`.
 4. Deploy. Render gives you `https://<name>.onrender.com` — that is your public web version.
 
 Then open the site, go to **Settings → Supabase connection → Test connection**. When the three checks are
 green, storage is off the machine and a redeploy cannot delete anything. Also set
 `NEXT_PUBLIC_SITE_URL=https://<name>.onrender.com` so the Google redirect URI is built from the public
 address.
+
+**Want Render's own disk instead of Supabase?** That needs the paid **Starter** plan: change `plan: free`
+to `plan: starter` and uncomment the `disk:` block at the bottom of `render.yaml`.
+
+**Health check:** every host probes `/api/health`. It answers `{"ok":true}` without a session or a database
+call, so a Supabase outage never makes a healthy deployment look dead.
 
 ---
 

@@ -55,8 +55,9 @@ USER nextjs
 EXPOSE 3000
 VOLUME ["/app/.data"]
 
-# A container that cannot answer /login is not healthy.
+# Liveness probe. /api/health answers 200 without touching the database, so a
+# Supabase outage never marks the container unhealthy — only a dead server does.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "server.js"]
