@@ -2,11 +2,14 @@
 const nextConfig = {
   reactStrictMode: true,
   /**
-   * Emit a self-contained server (`.next/standalone`) for the Docker image and
-   * for any host that runs the build output directly. `next start` keeps working
-   * for the plain `npm run start` flow, so this changes nothing locally.
+   * Self-contained server output, for the Docker image only.
+   *
+   * `next start` refuses to run against a standalone build, so this stays OFF
+   * unless the build explicitly asks for it (the Dockerfile sets
+   * NEXT_OUTPUT_STANDALONE=1). Local `npm run build && npm start` therefore
+   * behaves exactly as before.
    */
-  output: "standalone",
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "1" ? { output: "standalone" } : {}),
   // The app is previewed through a proxied host in sandboxes; allow those dev
   // origins so Next does not block its own asset requests.
   allowedDevOrigins: ["localhost", "127.0.0.1", "*.e2b.app", "*.arena.ai"],
