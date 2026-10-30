@@ -340,6 +340,50 @@ describe("Google sign-in", () => {
       ),
     ).rejects.toThrow(/suspended/i);
   });
+
+  /*
+   * ALLOW_SIGNUP=false must close Google too. Otherwise the public link is a side
+   * door: anyone with a Google account could create one. The owner's own address
+   * stays allowed, or a fresh deployment could lock its owner out.
+   */
+  it("creates no new account when sign-up is closed", async () => {
+    process.env.ALLOW_SIGNUP = "false";
+    try {
+      await expect(
+        auth.signInWithGoogle({ sub: "closed-sub", email: "newcomer@studio.test", name: "New" }),
+      ).rejects.toThrow(/New accounts are closed/i);
+      const users = await auth.listUsers();
+      expect(users.some((user) => user.email === "newcomer@studio.test")).toBe(false);
+    } finally {
+      delete process.env.ALLOW_SIGNUP;
+    }
+  });
+
+  it("still lets an existing account sign in with Google while sign-up is closed", async () => {
+    const existing = await member("existinggoogle");
+    process.env.ALLOW_SIGNUP = "false";
+    try {
+      const user = await auth.signInWithGoogle(
+        { sub: "existing-sub", email: existing.email, name: existing.name },
+        "vitest",
+      );
+      expect(user.id).toBe(existing.id);
+    } finally {
+      delete process.env.ALLOW_SIGNUP;
+    }
+  });
+
+  it("always lets the owner address in, so a closed studio cannot lock itself out", async () => {
+    const owner = (await auth.listUsers()).find((entry) => entry.email === ADMIN);
+    if (owner) await auth.deleteUser(owner.id);
+    process.env.ALLOW_SIGNUP = "false";
+    try {
+      const created = await auth.signInWithGoogle({ sub: "owner-sub", email: ADMIN, name: "Owner" });
+      expect(created.isAdmin).toBe(true);
+    } finally {
+      delete process.env.ALLOW_SIGNUP;
+    }
+  });
 });
 
 describe("role guards on the studio APIs", () => {

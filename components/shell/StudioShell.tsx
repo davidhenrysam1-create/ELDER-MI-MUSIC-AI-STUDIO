@@ -8,6 +8,7 @@ import { GlassCard, GradientText, StatusPill, Toasts, cn, Modal, ProgressBar } f
 import { GlobalPlayer } from "@/components/audio/GlobalPlayer";
 import { useStudio } from "@/lib/client/studio";
 import { canAdminister, canOpenRoute, canPublish, canUseStudio, describeRoles } from "@/lib/roles";
+import { AccountMenu } from "@/components/shell/AccountMenu";
 import type { AccountRole } from "@/lib/types";
 import { isPublicPath } from "@/lib/routes";
 import { formatBytes, relativeTime } from "@/lib/format";
@@ -348,7 +349,18 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
 }
 
 function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
-  const { projects, project, saveState, savedAt, selectProject, settings, user } = useStudio();
+  const {
+    projects,
+    project,
+    saveState,
+    savedAt,
+    selectProject,
+    settings,
+    user,
+    openStudio,
+    signOut,
+    ready,
+  } = useStudio();
   const pathname = usePathname();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const jobs = project?.jobs ?? [];
@@ -476,17 +488,17 @@ function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
 
           <NewProjectButton />
 
-          <div className="hidden items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 sm:flex">
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-violet to-cyan text-[10px] font-bold text-white">
-              EM
-            </span>
-            <span className="text-[11px] text-muted">
-              Studio owner
-              <span className="ml-1 hidden text-[9px] uppercase tracking-wider text-emerald-300/80 md:inline">
-                local
-              </span>
-            </span>
-          </div>
+          {/*
+            The real account control, top-right on every screen size. It replaces
+            a static "EM · Studio owner · local" chip whose initials were
+            hardcoded and which could not be clicked.
+          */}
+          <AccountMenu
+            user={user}
+            openStudio={openStudio}
+            loading={!ready}
+            onSignOut={() => void signOut?.()}
+          />
         </div>
       </div>
       <div className="scroll-x flex items-center gap-1.5 border-t border-white/[0.05] px-3 py-1.5 lg:hidden">

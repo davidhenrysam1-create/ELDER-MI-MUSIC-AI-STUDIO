@@ -183,6 +183,10 @@ A public URL is reachable by anyone who has it. Before you share the address:
   the sign-in screen, so visitors cannot reach your projects, settings, exports
   or the admin console.
 - **Set `ADMIN_PASSWORD`** to something you have not used anywhere else.
+- **Set `ALLOW_SIGNUP=false`** if the site is only for you. That closes new
+  accounts **including through Google** — otherwise anybody with a Google account
+  who has your link can create one. Your own `ADMIN_EMAIL` can always sign in, so
+  you cannot lock yourself out. Leave it out if friends should be able to join.
 - **Never put the Supabase secret key in a message, screenshot or commit.** It
   belongs only in the host's environment-variable field.
 

@@ -81,10 +81,17 @@ export const PASSWORD_MAX = 200;
 /** Error with an HTTP status, mapped straight onto a JSON response. */
 export class AuthError extends Error {
   readonly status: number;
-  constructor(message: string, status = 400) {
+  /**
+   * Optional machine-readable reason, for the few cases where the *caller* has
+   * to react differently from a plain "it failed" — e.g. Google sign-in with
+   * new accounts closed must not be reported as a suspended account.
+   */
+  readonly code?: string;
+  constructor(message: string, status = 400, code?: string) {
     super(message);
     this.name = "AuthError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -1089,6 +1096,22 @@ export async function signInWithGoogle(
     });
     await startSession(updated.id, userAgent);
     return toPublic(updated);
+  }
+
+  /*
+   * Nobody exists with this address yet, so this would be a *new* account.
+   * Honour `ALLOW_SIGNUP=false` here too: without this check Google would be a
+   * side door around a closed studio, and anyone who had the public link could
+   * create an account. The owner's own address is always allowed, because the
+   * owner must never be able to lock themselves out of a fresh deployment.
+   */
+  const signupAllowed = (process.env.ALLOW_SIGNUP ?? "true").trim().toLowerCase() !== "false";
+  if (!signupAllowed && !isAdminEmail(email)) {
+    throw new AuthError(
+      "New accounts are closed on this studio. Sign in with an existing account, or ask the owner for access.",
+      403,
+      "signup_closed",
+    );
   }
 
   const created = await mutateDb((state) => {
