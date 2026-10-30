@@ -201,6 +201,30 @@ public address.
 
 ---
 
+## Google sign-in on a free deployment
+
+Google accepts **only** the callback addresses registered for that OAuth client,
+so the address matters more than anything else:
+
+| Where you are | Does Google work there? |
+|---|---|
+| `https://<name>.onrender.com` | **Yes**, once that exact callback is registered |
+| `http://localhost:3200` | **Yes**, if you register the local callback too |
+| A preview, tunnel or Codespaces port | **No** — the address changes every session, so it can never be registered. Use email + password there |
+| An address that differs from `NEXT_PUBLIC_SITE_URL` | **No** — the app stops before Google and says so, instead of showing Google's opaque 403 |
+
+The callback is always `<address>/api/auth/google/callback`:
+
+```
+https://elder-mi-music-ai-studio.onrender.com/api/auth/google/callback
+http://localhost:3200/api/auth/google/callback
+```
+
+Moving to a custom domain later means adding the new callback **and** updating
+`NEXT_PUBLIC_SITE_URL` (or pinning it with `GOOGLE_REDIRECT_URI`).
+
+---
+
 ## If something goes wrong
 
 | What you see | What it means | Fix |
@@ -213,6 +237,8 @@ public address.
 | Login says *"No owner account can be created yet"* | The host has no `ADMIN_PASSWORD`, so there is no password to check against | Add `ADMIN_PASSWORD` (8+ characters) to the host's environment and redeploy |
 | Signed in, then thrown out after a while | A free instance restarted, taking the temporary database with it — Supabase is not configured | Fill in the Supabase variables; Settings will confirm it |
 | Upload fails on Vercel with a size error | Vercel's 4.5 MB request limit | Use Render for uploads, or upload to Supabase directly |
+| Google shows **403. That's an error.** | The app handed Google a callback address the browser is not on — a preview/tunnel address, or a `NEXT_PUBLIC_SITE_URL` that no longer matches | Nothing to fix in the app: the sign-in now stops *before* Google and names the address to use |
+| `redirect_uri_mismatch` | The callback registered in Google Cloud is not character-for-character the one the app uses | Re-copy `<address>/api/auth/google/callback` from the browser bar |
 
 ---
 

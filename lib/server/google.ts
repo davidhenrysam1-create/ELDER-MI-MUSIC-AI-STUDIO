@@ -61,12 +61,70 @@ export function requestOrigin(request: Request): string {
   return host ? `${proto}://${host}` : url.origin;
 }
 
-/** The callback URL Google must be told about. Must match the Cloud console. */
+/** Lowercased host of an absolute URL, or "" when it cannot be parsed. */
+function hostOf(value: string): string {
+  try {
+    return new URL(value).host.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Hosts that mean "this same machine", so a laptop must not be reported as a
+ * mismatch just because it is reached as `127.0.0.1` instead of `localhost`.
+ */
+function sameMachine(a: string, b: string): boolean {
+  const loopback = new Set(["localhost", "127.0.0.1", "[::1]", "0.0.0.0"]);
+  return loopback.has(a.split(":")[0]) && loopback.has(b.split(":")[0]);
+}
+
+/**
+ * The callback URL Google must be told about. It has to match the Cloud console
+ * **character for character**, and — this is the part that bites — it must be a
+ * host the browser is actually on. Sending Google `http://localhost:3200/...`
+ * from a public address makes Google refuse with a bare "403. That's an error.",
+ * which looks like the app is broken.
+ *
+ * So the order is:
+ *   1. `GOOGLE_REDIRECT_URI` when set — the operator has taken control.
+ *   2. `NEXT_PUBLIC_SITE_URL` **only when it names the host we are serving**, so
+ *      a public deployment keeps its canonical address.
+ *   3. Otherwise the origin the browser really used.
+ */
 export function redirectUri(origin: string): string {
-  const configured = process.env.GOOGLE_REDIRECT_URI?.trim();
-  if (configured) return configured;
-  const base = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") || origin;
-  return `${base}/api/auth/google/callback`;
+  const explicit = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (explicit) return explicit;
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
+  const originHost = hostOf(origin);
+  if (configured && hostOf(configured) === originHost) {
+    return `${configured}/api/auth/google/callback`;
+  }
+  return `${origin}/api/auth/google/callback`;
+}
+
+/**
+ * Why this address cannot complete a Google sign-in, in the operator's terms —
+ * or `null` when the configured address and the browser agree.
+ *
+ * A preview URL (`https://<port>-<id>.e2b.app`, a Codespaces port, a tunnel)
+ * changes every session, so it can never be registered with Google. Rather than
+ * bouncing the visitor onto Google's opaque error page, the sign-in route uses
+ * this to explain the situation on our own screen and point at the address that
+ * *is* registered.
+ */
+export function redirectHostMismatch(
+  origin: string,
+): { configuredHost: string; currentHost: string } | null {
+  const configured =
+    process.env.GOOGLE_REDIRECT_URI?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!configured) return null;
+  const configuredHost = hostOf(configured);
+  const currentHost = hostOf(origin);
+  if (!configuredHost || !currentHost) return null;
+  if (configuredHost === currentHost) return null;
+  if (sameMachine(configuredHost, currentHost)) return null;
+  return { configuredHost, currentHost };
 }
 
 /** Build the consent-screen URL. */
