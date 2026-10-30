@@ -429,6 +429,12 @@ export const api = {
         durable: boolean;
         /** Set when a requested driver could not start (missing credentials). */
         warning?: string | null;
+        /** Live degradation: Supabase configured but unreachable from here. */
+        runtime?: {
+          degraded: boolean;
+          message: string | null;
+          failures: { scope: "blobs" | "database"; message: string; at: string }[];
+        };
         blobs: {
           kind: "local" | "supabase";
           label: string;

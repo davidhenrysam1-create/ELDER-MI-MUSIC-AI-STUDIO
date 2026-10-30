@@ -1,9 +1,16 @@
 /**
  * Driver selection and honest reporting.
  *
- * The rule: **credentials decide**. Paste `SUPABASE_URL` and a service-role key
- * and the studio starts using durable storage on the next restart — no code
- * change, no migration command. Without them everything stays on this machine's
+ * The rule: **credentials decide**. Paste `SUPABASE_URL` and a secret key and the
+ * studio starts using durable storage on the next restart — no code change, no
+ * migration command. Both key generations are accepted:
+ *
+ *  - legacy `service_role` JWTs (`eyJhbGciOi…`) as `SUPABASE_SERVICE_ROLE_KEY`;
+ *  - the newer secret keys (`sb_secret_…`) as `SUPABASE_SECRET_KEY`.
+ *
+ * The publishable/anon key is deliberately **not** accepted for server writes:
+ * it is governed by row-level security, so every write would fail with a 401 in
+ * production while looking configured. Without them everything stays on this machine's
  * disk, and every screen that mentions storage says so rather than implying the
  * work is backed up.
  *
@@ -22,6 +29,9 @@ import path from "node:path";
 import type { BlobStore, DriverStatus, SnapshotStore } from "./types";
 import { localBlobStore, localSnapshotStore } from "./local";
 import { supabaseBlobStore, supabaseSnapshotStore, type SupabaseConfig } from "./supabase";
+import { resilientBlobStore, resilientSnapshotStore, runtimeStatus } from "./resilient";
+
+export { resetRuntimeStatus, runtimeStatus } from "./resilient";
 
 export type { BlobStore, DriverStatus, SnapshotStore } from "./types";
 
@@ -30,19 +40,59 @@ export function dataDir(): string {
   return process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(process.cwd(), ".data");
 }
 
-function serviceKey(): string {
+/**
+ * A value that is obviously a placeholder, not a credential.
+ *
+ * Copying a config template and forgetting one line is the commonest setup
+ * mistake; treating `paste_your_key_here` as configured would turn it into a
+ * confusing 401 on every upload instead of a readable "this is not set yet".
+ */
+function isPlaceholder(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (!v) return true;
   return (
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_SERVICE_KEY?.trim() ||
-    ""
+    v.includes("paste_") ||
+    v.includes("your_") ||
+    v === "changeme" ||
+    v === "todo" ||
+    v === "xxx" ||
+    v.startsWith("<")
   );
+}
+
+/**
+ * The server-side secret, whichever generation of key was supplied.
+ *
+ * `sb_secret_…` (new) and `service_role` JWTs (legacy) are used identically:
+ * in the `apikey` header and as a bearer token. The publishable key is never
+ * returned here, on purpose.
+ */
+function secretKey(): string {
+  const candidates = [
+    process.env.SUPABASE_SECRET_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_SERVICE_KEY,
+  ];
+  for (const candidate of candidates) {
+    const value = candidate?.trim() ?? "";
+    if (value && !isPlaceholder(value)) return value;
+  }
+  return "";
+}
+
+/** True when a publishable/anon key was supplied where a secret one belongs. */
+function onlyPublishableKey(): boolean {
+  const publishable =
+    process.env.SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.SUPABASE_ANON_KEY?.trim() || "";
+  return Boolean(publishable && !isPlaceholder(publishable) && !secretKey());
 }
 
 /** The Supabase settings, or null when they are not all present. */
 export function supabaseConfig(): SupabaseConfig | null {
   const url = process.env.SUPABASE_URL?.trim();
-  const key = serviceKey();
-  if (!url || !key) return null;
+  const key = secretKey();
+  // A URL left as a template value counts as missing too.
+  if (!url || isPlaceholder(url) || !key) return null;
   return {
     url,
     key,
@@ -53,11 +103,15 @@ export function supabaseConfig(): SupabaseConfig | null {
 
 /** Why Supabase is not in use, in words the owner can act on. */
 function missingReason(): string {
-  if (!process.env.SUPABASE_URL?.trim() && !serviceKey()) {
-    return "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to keep audio and the database off this machine.";
+  const hasUrl = Boolean(process.env.SUPABASE_URL?.trim()) && !isPlaceholder(process.env.SUPABASE_URL ?? "");
+  if (!hasUrl && !secretKey()) {
+    return "Set SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) to keep audio and the database off this machine.";
   }
-  if (!process.env.SUPABASE_URL?.trim()) return "SUPABASE_URL is missing.";
-  return "SUPABASE_SERVICE_ROLE_KEY is missing.";
+  if (!hasUrl) return "SUPABASE_URL is missing or still a placeholder.";
+  if (onlyPublishableKey()) {
+    return "Only the publishable key was supplied; the server needs the secret key (sb_secret_…) to write audio and the database.";
+  }
+  return "SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is missing or still a placeholder.";
 }
 
 export type DriverChoice = "local" | "supabase";
@@ -132,10 +186,13 @@ export function blobStore(): BlobStore {
   // and reports the problem through `driverHealth()`.
   const choice = storageDriverHealth().effective;
   const config = supabaseConfig();
+  const local = localBlobStore(dataDir());
   if (choice === "supabase" && config) {
-    blobCache = supabaseBlobStore(config);
+    // Remote first, this machine's copy when the network or the key fails: an
+    // unreachable bucket must not stop someone recording.
+    blobCache = resilientBlobStore(supabaseBlobStore(config), local);
   } else {
-    blobCache = localBlobStore(dataDir());
+    blobCache = local;
   }
   return blobCache;
 }
@@ -145,10 +202,11 @@ export function snapshotStore(): SnapshotStore {
   if (snapshotCache) return snapshotCache;
   const choice = databaseDriverHealth().effective;
   const config = supabaseConfig();
+  const local = localSnapshotStore(path.join(dataDir(), "db.json"));
   if (choice === "supabase" && config) {
-    snapshotCache = supabaseSnapshotStore(config);
+    snapshotCache = resilientSnapshotStore(supabaseSnapshotStore(config), local);
   } else {
-    snapshotCache = localSnapshotStore(path.join(dataDir(), "db.json"));
+    snapshotCache = local;
   }
   return snapshotCache;
 }
@@ -192,14 +250,22 @@ export function storageStatus(): {
   const dbHealth = databaseDriverHealth();
   const blobs = statusFor(blobHealth.effective, blobStore().label, "STORAGE_DRIVER");
   const database = statusFor(dbHealth.effective, snapshotStore().label, "DATABASE_DRIVER");
+  const runtime = runtimeStatus();
   return {
     blobs: { ...blobs, warning: blobHealth.warning },
     database: { ...database, warning: dbHealth.warning },
-    warning: blobHealth.warning ?? dbHealth.warning,
+    // A configured remote store that cannot be reached is *also* a warning, and
+    // a louder one: data is being written somewhere other than asked.
+    warning: runtime.message ?? blobHealth.warning ?? dbHealth.warning,
   };
 }
 
 /** True when audio and the database both actually leave this machine. */
 export function durableStorage(): boolean {
-  return storageDriverHealth().effective === "supabase" && databaseDriverHealth().effective === "supabase";
+  // Configured *and* currently reachable: a degraded fallback is not durable.
+  return (
+    storageDriverHealth().effective === "supabase" &&
+    databaseDriverHealth().effective === "supabase" &&
+    !runtimeStatus().degraded
+  );
 }

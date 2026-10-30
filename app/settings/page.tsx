@@ -363,7 +363,24 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="mt-3 space-y-2">
-            {system?.storageDrivers?.warning ? (
+            {system?.storageDrivers?.runtime?.degraded ? (
+              <div className="rounded-xl border border-rose-400/40 bg-rose-500/10 p-3 text-[10px] leading-relaxed text-rose-100">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Icon name="alert" size={12} /> Supabase is configured but unreachable
+                </div>
+                <p className="mt-1">{system.storageDrivers.runtime.message}</p>
+                <ul className="mt-1 list-inside list-disc text-rose-100/80">
+                  {system.storageDrivers.runtime.failures.map((failure) => (
+                    <li key={failure.scope}>
+                      <span className="mono">
+                        {failure.scope === "blobs" ? "audio/exports" : "database"}
+                      </span>
+                      : {failure.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : system?.storageDrivers?.warning ? (
               <div className="rounded-xl border border-rose-400/40 bg-rose-500/10 p-3 text-[10px] leading-relaxed text-rose-100">
                 <div className="flex items-center gap-1.5 font-semibold">
                   <Icon name="alert" size={12} /> Supabase was requested but did not start

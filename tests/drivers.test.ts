@@ -12,7 +12,13 @@ import {
   resetDrivers,
   storageDriverChoice,
   storageStatus,
+  supabaseConfig,
 } from "@/lib/server/drivers";
+import {
+  resetRuntimeStatus,
+  resilientSnapshotStore,
+  runtimeStatus,
+} from "@/lib/server/drivers/resilient";
 
 /**
  * Storage drivers.
@@ -38,9 +44,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.SUPABASE_URL;
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  delete process.env.SUPABASE_SECRET_KEY;
+  delete process.env.SUPABASE_PUBLISHABLE_KEY;
   delete process.env.STORAGE_DRIVER;
   delete process.env.DATABASE_DRIVER;
   resetDrivers();
+  resetRuntimeStatus();
 });
 
 const bytes = (text: string) => new TextEncoder().encode(text);
@@ -296,5 +305,138 @@ describe("driver selection", () => {
     expect(health.blobs.effective).toBe("supabase");
     expect(storageStatus().warning).toBeNull();
     expect(durableStorage()).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Key generations and network failure                                 */
+/* ------------------------------------------------------------------ */
+
+describe("Supabase credentials", () => {
+  it("accepts the newer secret key and the legacy service_role key alike", () => {
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_SECRET_KEY = "sb_secret_abc123";
+    resetDrivers();
+    expect(supabaseConfig()?.key).toBe("sb_secret_abc123");
+
+    delete process.env.SUPABASE_SECRET_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiJ9.legacy.jwt";
+    resetDrivers();
+    expect(supabaseConfig()?.key).toBe("eyJhbGciOiJIUzI1NiJ9.legacy.jwt");
+  });
+
+  it("prefers the secret key when both are present", () => {
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_SECRET_KEY = "sb_secret_new";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "eyJlegacy";
+    resetDrivers();
+    expect(supabaseConfig()?.key).toBe("sb_secret_new");
+  });
+
+  it("treats a copied placeholder as 'not configured', not as a key", () => {
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_SECRET_KEY = "paste_your_supabase_secret_key_here";
+    resetDrivers();
+    expect(supabaseConfig()).toBeNull();
+    expect(storageStatus().blobs.durable).toBe(false);
+  });
+
+  it("explains that the publishable key alone cannot write", () => {
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_abc";
+    process.env.STORAGE_DRIVER = "supabase";
+    resetDrivers();
+    const health = driverHealth();
+    expect(health.ok).toBe(false);
+    expect(health.blobs.warning).toMatch(/publishable/i);
+    expect(health.blobs.warning).toMatch(/secret key/i);
+  });
+});
+
+describe("resilience when the remote store is unreachable", () => {
+  const config = { url: "https://project.supabase.co", key: "sb_secret_x", bucket: "tracks", table: "songs" };
+
+  it("loads the local copy and records the failure instead of crashing", async () => {
+    const local = localSnapshotStore(path.join(tmpDir, "resilience-a", "db.json"));
+    await local.save({ version: 3, marker: "local copy" });
+
+    const failing = {
+      kind: "supabase" as const,
+      label: "down",
+      load: async () => {
+        throw new Error("getaddrinfo ENOTFOUND project.supabase.co");
+      },
+      save: async () => {
+        throw new Error("offline");
+      },
+    };
+
+    const store = resilientSnapshotStore(failing, local);
+    expect(await store.load()).toEqual({ version: 3, marker: "local copy" });
+
+    const status = runtimeStatus();
+    expect(status.degraded).toBe(true);
+    expect(status.message).toMatch(/not in Supabase/i);
+    expect(status.failures[0].scope).toBe("database");
+  });
+
+  it("keeps writing to this machine so a session does not lose work", async () => {
+    const local = localSnapshotStore(path.join(tmpDir, "resilience-b", "db.json"));
+    const store = resilientSnapshotStore(
+      {
+        kind: "supabase",
+        label: "down",
+        load: async () => null,
+        save: async () => {
+          throw new Error("503 Service Unavailable");
+        },
+      },
+      local,
+    );
+    await store.save({ version: 3, marker: "saved during outage" });
+    expect((await local.load() as { marker: string }).marker).toBe("saved during outage");
+  });
+
+  it("clears the warning as soon as the remote store answers again", async () => {
+    resetRuntimeStatus();
+    const local = localSnapshotStore(path.join(tmpDir, "resilience-c", "db.json"));
+    let healthy = false;
+    const flaky = {
+      kind: "supabase" as const,
+      label: "flaky",
+      load: async () => {
+        if (!healthy) throw new Error("offline");
+        return { version: 3, marker: "remote" };
+      },
+      save: async () => undefined,
+    };
+    const store = resilientSnapshotStore(flaky, local);
+
+    await store.load();
+    expect(runtimeStatus().degraded).toBe(true);
+
+    healthy = true;
+    expect(await store.load()).toEqual({ version: 3, marker: "remote" });
+    expect(runtimeStatus().degraded).toBe(false);
+  });
+
+  it("a degraded remote never reports itself as durable storage", async () => {
+    process.env.SUPABASE_URL = config.url;
+    process.env.SUPABASE_SECRET_KEY = config.key;
+    process.env.STORAGE_DRIVER = "supabase";
+    process.env.DATABASE_DRIVER = "supabase";
+    resetDrivers();
+    resetRuntimeStatus();
+    expect(durableStorage()).toBe(true);
+
+    // Simulate one failed call through the wrapper.
+    const local = localSnapshotStore(path.join(tmpDir, "resilience-d", "db.json"));
+    const wrapped = resilientSnapshotStore(
+      { kind: "supabase", label: "down", load: async () => { throw new Error("offline"); }, save: async () => undefined },
+      local,
+    );
+    await wrapped.load();
+    expect(runtimeStatus().degraded).toBe(true);
+    expect(durableStorage()).toBe(false);
   });
 });
