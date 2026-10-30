@@ -1,0 +1,34 @@
+# Render blueprint — a public web version with a real disk, which is what the
+# audio uploads need. Import this repository at render.com → New → Blueprint.
+services:
+  - type: web
+    name: elder-mi-music-ai-studio
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /app/.data
+      # Set these in the Render dashboard (they are secrets):
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: tracks
+      - key: SUPABASE_TABLE
+        value: songs
+      - key: STORAGE_DRIVER
+        value: supabase
+      - key: DATABASE_DRIVER
+        value: supabase
+    disk:
+      name: studio-data
+      mountPath: /app/.data
+      sizeGB: 1

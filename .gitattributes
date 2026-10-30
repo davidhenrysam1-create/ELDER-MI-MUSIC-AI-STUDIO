@@ -1,0 +1,7 @@
+# Checkout text files with the line endings each platform expects, so a clone on
+# Windows does not turn every file into a diff.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.wav binary
+*.mp3 binary

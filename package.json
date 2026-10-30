@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "verify": "npm run typecheck && npm test && npm run build",
+    "docker:build": "docker build -t elder-mi-studio .",
+    "docker:run": "docker run -p 3000:3000 --env-file .env.local -v elder-mi-data:/app/.data elder-mi-studio"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
@@ -31,5 +34,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   }
 }
